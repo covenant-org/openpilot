@@ -33,9 +33,12 @@ int main() {
   ps.setSbu2Voltage(12000 / 1000.0f);
   PubMaster pm({"pandaStates"});
   pm.send("pandaStates", msg);
-  ps.setUptime(10);
-  ps.setIgnitionLine(1);
-  ps.setIgnitionCan(1);
-  pm.send("pandaStates", msg);
+  int time = 0;
+  while(true){
+    ps.setUptime(time+=10);
+    ps.setIgnitionLine(1);
+    ps.setIgnitionCan(1);
+    pm.send("pandaStates", msg);
+  }
   return 0;
 }
