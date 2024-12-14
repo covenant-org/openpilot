@@ -284,9 +284,6 @@ int PandaFakeHandle::control_write(uint8_t bRequest, uint16_t wValue, uint16_t w
 }
 
 int PandaFakeHandle::control_read(uint8_t bRequest, uint16_t wValue, uint16_t wIndex, unsigned char *data, uint16_t wLength, unsigned int timeout) {
-    const char *firmware = "DEV-3246634c-RELEASE";
-    uint8_t firmware_len = 20;
-
     switch (bRequest){
         case PandaEndpoints::GET_FAN_SPEED:
             *data = this->fan_speed;
