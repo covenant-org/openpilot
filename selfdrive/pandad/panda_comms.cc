@@ -1,3 +1,4 @@
+#include "panda_comms.h"
 #include "selfdrive/pandad/panda.h"
 
 #include <cassert>
@@ -225,3 +226,185 @@ int PandaUsbHandle::bulk_read(unsigned char endpoint, unsigned char* data, int l
 
   return transferred;
 }
+
+PandaFakeHandle::PandaFakeHandle(std::string serial): PandaCommsHandle(serial) {
+    this->hw_serial = serial;
+}
+
+PandaFakeHandle::~PandaFakeHandle() {
+    this->connected = false;
+}
+
+std::vector<std::string> PandaFakeHandle::list() {
+  std::vector<std::string> serials;
+  serials.push_back("fake_1");
+  return serials;
+}
+
+int PandaFakeHandle::control_write(uint8_t bRequest, uint16_t wValue, uint16_t wIndex, unsigned int timeout) {
+    switch (bRequest){
+        case PandaEndpoints::SET_SAFETY_MODEL:
+            this->safety_model = wValue;
+            return 0;
+        case PandaEndpoints::SET_ALTERNATIVE_EXPERIENCE:
+            this->alternative_experience = wValue;
+            return 0;
+        case PandaEndpoints::SET_FAN_SPEED:
+            this->fan_speed = wValue;
+            return 0;
+        case PandaEndpoints::SET_IR_PWR:
+            this->ir_pwr = wValue;
+            return 0;
+        case PandaEndpoints::SET_LOOPBACK:
+            this->loopback = wValue;
+            return 0;
+        case PandaEndpoints::SET_POWER_SAVING:
+            this->power_saving = wValue;
+            return 0;
+        case PandaEndpoints::SET_CAN_SPEED:
+            this->can_speed[wValue] = wIndex;
+            return 0;
+        case PandaEndpoints::SET_DATA_SPEED:
+            this->data_speed[wValue] = wIndex;
+            return 0;
+        case PandaEndpoints::SET_CANFD_NON_ISO:
+            this->canfd[wValue] = wIndex;
+            return 0;
+        default:
+            return 0;
+    }
+}
+
+int PandaFakeHandle::control_read(uint8_t bRequest, uint16_t wValue, uint16_t wIndex, unsigned char *data, uint16_t wLength, unsigned int timeout) {
+    switch (bRequest){
+        case PandaEndpoints::GET_FAN_SPEED:
+            *data = this->fan_speed;
+            break;
+        case PandaEndpoints::GET_HW_TYPE:
+            *data = 1;
+            break;
+        case PandaEndpoints::GET_STATE: {
+            // uptime
+            this->uptime += 100;
+            data[0] = (this->uptime & 0xFF000000) >> 24;
+            data[1] = (this->uptime & 0xFF0000) >> 16;
+            data[2] = (this->uptime & 0xFF00) >> 8;
+            data[3] = this->uptime & 0xFF;
+
+            // voltage
+            data[4] = 0;
+            data[5] = 0;
+            data[6] = 0;
+            data[7] = 12;
+
+            // current
+            data[8] = 0;
+            data[9] = 0;
+            data[10] = 0;
+            data[11] = 0;
+
+            // tx_blocked
+            data[12] = 0;
+            data[13] = 0;
+            data[14] = 0;
+            data[15] = 0;
+
+            // rx_invalid
+            data[16] = 0;
+            data[17] = 0;
+            data[18] = 0;
+            data[19] = 0;
+
+            // tx_overflows
+            data[20] = 0;
+            data[21] = 0;
+            data[22] = 0;
+            data[23] = 0;
+
+            // rx_overflows
+            data[24] = 0;
+            data[25] = 0;
+            data[26] = 0;
+            data[27] = 0;
+
+            // faults
+            data[28] = 0;
+            data[29] = 0;
+            data[30] = 0;
+            data[31] = 0;
+
+            // ignition line
+            data[32] = this->ignited;
+
+            // ignition can
+            data[33] = this->ignited;
+
+            // controls allowed
+            data[34] = 1;
+
+            // car harness status
+            data[35] = 1; // normal
+
+            // safety mode
+            data[36] = 0;
+
+            // fault_status
+            data[37] = 0;
+
+            // safety param
+            data[38] = 0;
+            data[39] = 0;
+
+            //fault status
+            data[40] = 0;
+
+            // power save enabled
+            data[41] = this->power_saving;
+
+            // heartbeat lost
+            data[42] = 0;
+
+            // alternative experience
+            data[43] = (this->alternative_experience & 0xFF00) >> 8;
+            data[44] = this->alternative_experience & 0xFF;
+
+            // interrupt load
+            data[45] = 0;
+            data[46] = 0;
+            data[47] = 0;
+            data[48] = 0;
+
+            // fan power
+            data[49] = 0;
+
+            // safety rx checks invalid
+            data[50] = 0;
+
+            // spi checksum error count
+            data[51] = 0;
+            data[52] = 0;
+
+            // fan stall count
+            data[53] = 0;
+
+            // sub1 voltage mv
+            uint16_t volt = 12000;
+            data[54] = (volt & 0xFF00) >> 8;
+            data[55] = volt & 0xFF;
+
+            // sub2 voltage mv
+            data[56] = (volt & 0xFF00) >> 8;
+            data[57] = volt & 0xFF;
+
+            // som reset tirggered
+            data[58] = 0;
+            this->ignited = 1;
+            break;
+        }
+    }
+    return wLength;
+}
+
+int PandaFakeHandle::bulk_write(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout) {}
+
+int PandaFakeHandle::bulk_read(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout) {}
