@@ -90,4 +90,61 @@ private:
   spi_header header;
   uint32_t xfer_count = 0;
 };
+
+class PandaFakeHandle : public PandaCommsHandle {
+public:
+  PandaFakeHandle(std::string serial);
+  ~PandaFakeHandle();
+  int control_write(uint8_t request, uint16_t param1, uint16_t param2, unsigned int timeout=TIMEOUT);
+  int control_read(uint8_t request, uint16_t param1, uint16_t param2, unsigned char *data, uint16_t length, unsigned int timeout=TIMEOUT);
+  int bulk_write(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout=TIMEOUT);
+  int bulk_read(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout=TIMEOUT);
+  void cleanup();
+
+  static std::vector<std::string> list();
+
+private:
+  uint16_t safety_model = 0;
+  uint16_t alternative_experience = 0;
+  uint16_t fan_speed = 0;
+  uint16_t ir_pwr = 0;
+  uint16_t loopback = 0;
+  bool deepsleep = 0;
+  bool engaged = 0;
+  bool power_saving = 0;
+  uint16_t can_speed[4] = {0, 0, 0, 0};
+  uint16_t data_speed[4] = {0, 0, 0, 0};
+  uint16_t canfd[4] = {0, 0, 0, 0};
+  uint32_t uptime = 0;
+  bool ignited = 0;
+};
+
+namespace PandaEndpoints{
+  static const uint8_t SET_SAFETY_MODEL = 0xdc;
+  static const uint8_t SET_ALTERNATIVE_EXPERIENCE = 0xdf;
+  static const uint8_t SET_FAN_SPEED = 0xb1;
+  static const uint8_t SET_IR_PWR = 0xb0;
+  static const uint8_t SET_LOOPBACK = 0xe5;
+  static const uint8_t SET_POWER_SAVING = 0xe7;
+  static const uint8_t SET_CAN_SPEED = 0xde;
+  static const uint8_t SET_DATA_SPEED = 0xf9;
+  static const uint8_t SET_CANFD_NON_ISO = 0xfc;
+
+  static const uint8_t CAN_RESET_COMMS = 0xc0;
+
+  static const uint8_t ENABLE_DEEPSLEEP = 0xfb;
+  static const uint8_t SEND_HEARTBEAT = 0xf3;
+
+  static const uint8_t GET_HW_TYPE = 0xc1;
+  static const uint8_t GET_FAN_SPEED = 0xb2;
+  static const uint8_t GET_STATE= 0xd2;
+  static const uint8_t GET_CAN_STATE= 0xc2;
+  static const uint8_t GET_FIRMWARE_VERSION_FIST = 0xd3;
+  static const uint8_t GET_FIRMWARE_VERSION_SECOND = 0xd4;
+
+  static const unsigned char CAN_BULK_WRITE = 3;
+  static const unsigned char CAN_JUNK_READ = 0xab;
+  static const unsigned char CAN_BULK_READ = 0xa8;
+}
+
 #endif

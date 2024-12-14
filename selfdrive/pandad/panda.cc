@@ -9,12 +9,13 @@
 #include "cereal/messaging/messaging.h"
 #include "common/swaglog.h"
 #include "common/util.h"
+#include "panda_comms.h"
 
 Panda::Panda(std::string serial, uint32_t bus_offset) : bus_offset(bus_offset) {
   // try USB first, then SPI
   try {
-    handle = std::make_unique<PandaUsbHandle>(serial);
-    LOGW("connected to %s over USB", serial.c_str());
+    handle = std::make_unique<PandaFakeHandle>(serial);
+    LOGW("connected to %s over Fake", serial.c_str());
   } catch (std::exception &e) {
 #ifndef __APPLE__
     handle = std::make_unique<PandaSpiHandle>(serial);
