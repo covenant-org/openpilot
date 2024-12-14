@@ -2,6 +2,7 @@
 #include "selfdrive/pandad/panda.h"
 
 #include <cassert>
+#include <cstdint>
 #include <stdexcept>
 #include <memory>
 
@@ -282,12 +283,29 @@ int PandaFakeHandle::control_write(uint8_t bRequest, uint16_t wValue, uint16_t w
 }
 
 int PandaFakeHandle::control_read(uint8_t bRequest, uint16_t wValue, uint16_t wIndex, unsigned char *data, uint16_t wLength, unsigned int timeout) {
+    const char *firmware = "DEV-3246634c-RELEASE";
+    uint8_t firmware_len = 20;
+
     switch (bRequest){
         case PandaEndpoints::GET_FAN_SPEED:
             *data = this->fan_speed;
             break;
         case PandaEndpoints::GET_HW_TYPE:
             *data = 1;
+            break;
+        case PandaEndpoints::GET_FIRMWARE_VERSION_FIST:
+            for(int ch =0; ch < 64; ch++){
+                data[ch] = 0;
+            }
+            break;
+        case PandaEndpoints::GET_FIRMWARE_VERSION_SECOND:
+            for(int ch =0; ch < 64; ch++){
+                if((64- firmware_len) <= ch){
+                    data[ch] = firmware[ch - (64 - firmware_len)];
+                }else{
+                    data[ch] = 0;
+                }
+            }
             break;
         case PandaEndpoints::GET_STATE: {
             // uptime
