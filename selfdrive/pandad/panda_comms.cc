@@ -1,5 +1,6 @@
 #include "panda_comms.h"
 #include "selfdrive/pandad/panda.h"
+#include "common/util.h"
 
 #include <cassert>
 #include <cstdint>
@@ -294,21 +295,17 @@ int PandaFakeHandle::control_read(uint8_t bRequest, uint16_t wValue, uint16_t wI
             *data = 1;
             break;
         case PandaEndpoints::GET_FIRMWARE_VERSION_FIST:
-            for(int ch =0; ch < 64; ch++){
-                if((ch < firmware_len)){
-                    data[ch] = firmware[ch];
-                }else if(ch == firmware_len){
-                    data[ch] = '\0';
-                }else{
-                    data[ch] = 0;
-                }
-            }
-            break;
+            {
+                auto content = util::read_file(std::string("../../panda/board/obj/") + "panda.bin.signed");
+                memcpy(data, content.data()+content.size()-128, 64);
+                break;
+           }
         case PandaEndpoints::GET_FIRMWARE_VERSION_SECOND:
-            for(int ch =0; ch < 64; ch++){
-                data[ch] = 0;
-            }
-            break;
+            {
+                auto content = util::read_file(std::string("../../panda/board/obj/") + "panda.bin.signed");
+                memcpy(data, content.data()+content.size()-64, 64);
+                break;
+           }
         case PandaEndpoints::GET_STATE: {
             // uptime
             this->uptime += 100;
