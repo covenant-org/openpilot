@@ -295,16 +295,18 @@ int PandaFakeHandle::control_read(uint8_t bRequest, uint16_t wValue, uint16_t wI
             break;
         case PandaEndpoints::GET_FIRMWARE_VERSION_FIST:
             for(int ch =0; ch < 64; ch++){
-                data[ch] = 0;
+                if((ch < firmware_len)){
+                    data[ch] = firmware[ch];
+                }else if(ch == firmware_len){
+                    data[ch] = '\0';
+                }else{
+                    data[ch] = 0;
+                }
             }
             break;
         case PandaEndpoints::GET_FIRMWARE_VERSION_SECOND:
             for(int ch =0; ch < 64; ch++){
-                if((64- firmware_len) <= ch){
-                    data[ch] = firmware[ch - (64 - firmware_len)];
-                }else{
-                    data[ch] = 0;
-                }
+                data[ch] = 0;
             }
             break;
         case PandaEndpoints::GET_STATE: {
