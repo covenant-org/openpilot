@@ -110,7 +110,7 @@ private:
   uint16_t ir_pwr = 0;
   uint16_t loopback = 0;
   bool deepsleep = 0;
-//  bool engaged = 0;
+  bool engaged = 0;
   bool power_saving = 0;
   uint16_t can_speed[4] = {0, 0, 0, 0};
   uint16_t data_speed[4] = {0, 0, 0, 0};
