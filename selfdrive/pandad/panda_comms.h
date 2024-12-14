@@ -71,7 +71,7 @@ public:
   int control_read(uint8_t request, uint16_t param1, uint16_t param2, unsigned char *data, uint16_t length, unsigned int timeout=TIMEOUT);
   int bulk_write(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout=TIMEOUT);
   int bulk_read(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout=TIMEOUT);
-  void cleanup();
+  void cleanup(){};
 
   static std::vector<std::string> list();
 
@@ -110,7 +110,7 @@ private:
   uint16_t ir_pwr = 0;
   uint16_t loopback = 0;
   bool deepsleep = 0;
-  bool engaged = 0;
+//  bool engaged = 0;
   bool power_saving = 0;
   uint16_t can_speed[4] = {0, 0, 0, 0};
   uint16_t data_speed[4] = {0, 0, 0, 0};
