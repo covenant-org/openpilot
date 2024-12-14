@@ -1,7 +1,9 @@
 #include "panda_comms.h"
 #include "selfdrive/pandad/panda.h"
+#include "common/util.h"
 
 #include <cassert>
+#include <cstdint>
 #include <stdexcept>
 #include <memory>
 
@@ -282,6 +284,9 @@ int PandaFakeHandle::control_write(uint8_t bRequest, uint16_t wValue, uint16_t w
 }
 
 int PandaFakeHandle::control_read(uint8_t bRequest, uint16_t wValue, uint16_t wIndex, unsigned char *data, uint16_t wLength, unsigned int timeout) {
+    const char *firmware = "DEV-3246634c-RELEASE";
+    uint8_t firmware_len = 20;
+
     switch (bRequest){
         case PandaEndpoints::GET_FAN_SPEED:
             *data = this->fan_speed;
@@ -289,6 +294,18 @@ int PandaFakeHandle::control_read(uint8_t bRequest, uint16_t wValue, uint16_t wI
         case PandaEndpoints::GET_HW_TYPE:
             *data = 1;
             break;
+        case PandaEndpoints::GET_FIRMWARE_VERSION_FIST:
+            {
+                auto content = util::read_file(std::string("../../panda/board/obj/") + "panda.bin.signed");
+                memcpy(data, content.data()+content.size()-128, 64);
+                break;
+           }
+        case PandaEndpoints::GET_FIRMWARE_VERSION_SECOND:
+            {
+                auto content = util::read_file(std::string("../../panda/board/obj/") + "panda.bin.signed");
+                memcpy(data, content.data()+content.size()-64, 64);
+                break;
+           }
         case PandaEndpoints::GET_STATE: {
             // uptime
             this->uptime += 100;
