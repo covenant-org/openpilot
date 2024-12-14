@@ -270,6 +270,12 @@ int PandaFakeHandle::control_write(uint8_t bRequest, uint16_t wValue, uint16_t w
         case PandaEndpoints::SET_CANFD_NON_ISO:
             this->canfd[wValue] = wIndex;
             return 0;
+        case PandaEndpoints::ENABLE_DEEPSLEEP:
+            this->deepsleep = wValue;
+            return 0;
+        case PandaEndpoints::SEND_HEARTBEAT:
+            this->engaged = wValue;
+            return 0;
         default:
             return 0;
     }
