@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
 #include <stdexcept>
 #include <memory>
 
@@ -425,10 +426,82 @@ int PandaFakeHandle::control_read(uint8_t bRequest, uint16_t wValue, uint16_t wI
     return wLength;
 }
 
+struct __attribute__((packed)) can_header {
+  uint8_t reserved : 1;
+  uint8_t bus : 3;
+  uint8_t data_len_code : 4;
+  uint8_t rejected : 1;
+  uint8_t returned : 1;
+  uint8_t extended : 1;
+  uint32_t addr : 29;
+  uint8_t checksum : 8;
+};
+
+struct can_frame {
+  long address;
+  std::string dat;
+  long busTime;
+  long src;
+};
+
+bool PandaFakeHandle::unpack_can_buffer(uint8_t *data, uint32_t &size, std::vector<can_frame> &out_vec) {
+  int pos = 0;
+
+  while (pos <= size - sizeof(can_header)) {
+    can_header header;
+    memcpy(&header, &data[pos], sizeof(can_header));
+
+    const uint8_t data_len = dlc_to_len[header.data_len_code];
+    if (pos + sizeof(can_header) + data_len > size) {
+      // we don't have all the data for this message yet
+      break;
+    }
+
+    if (calculate_checksum(&data[pos], sizeof(can_header) + data_len) != 0) {
+      LOGE("Panda CAN checksum failed");
+      size = 0;
+      can_reset_communications();
+      return false;
+    }
+
+    can_frame &canData = out_vec.emplace_back();
+    canData.busTime = 0;
+    canData.address = header.addr;
+    canData.src = header.bus + bus_offset;
+    if (header.rejected) {
+      canData.src += CAN_REJECTED_BUS_OFFSET;
+    }
+    if (header.returned) {
+      canData.src += CAN_RETURNED_BUS_OFFSET;
+    }
+
+    canData.dat.assign((char *)&data[pos + sizeof(can_header)], data_len);
+
+    pos += sizeof(can_header) + data_len;
+  }
+
+  // move the overflowing data to the beginning of the buffer for the next round
+  memmove(data, &data[pos], size - pos);
+  size -= pos;
+
+  return true;
+}
+
 int PandaFakeHandle::bulk_write(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout) {
+    printf("Write request: %02x \n", endpoint);
+    std::vector<can_frame> output;
+    this->unpack_can_buffer(data, length, output);
+    for(const can_frame &frame: output) {
+        printf("Address %ld: ", frame.address);
+        for(const char &byte: frame.dat){
+            printf("%02x ", byte);
+        }
+        printf("\n");
+    }
     return length;
 }
 
 int PandaFakeHandle::bulk_read(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout) {
+    printf("Read request: %02x %02x\n", endpoint, data[0]);
     return length;
 }
