@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <cstdio>
 #include <stdexcept>
 #include <memory>
 
@@ -425,10 +426,121 @@ int PandaFakeHandle::control_read(uint8_t bRequest, uint16_t wValue, uint16_t wI
     return wLength;
 }
 
+uint8_t Panda::calculate_checksum(uint8_t *data, uint32_t len) {
+  uint8_t checksum = 0U;
+  for (uint32_t i = 0U; i < len; i++) {
+    checksum ^= data[i];
+  }
+  return checksum;
+}
+
+bool unpack_can_buffer(uint8_t *data, uint32_t &size, std::vector<can_frame> &out_vec) {
+  int pos = 0;
+
+  while (pos <= size - sizeof(can_header)) {
+    can_header header;
+    memcpy(&header, &data[pos], sizeof(can_header));
+
+    const uint8_t data_len = dlc_to_len[header.data_len_code];
+    if (pos + sizeof(can_header) + data_len > size) {
+      // we don't have all the data for this message yet
+      break;
+    }
+
+    if (calculate_checksum(&data[pos], sizeof(can_header) + data_len) != 0) {
+      LOGE("Panda CAN checksum failed");
+      size = 0;
+      return false;
+    }
+
+    can_frame &canData = out_vec.emplace_back();
+    canData.busTime = 0;
+    canData.address = header.addr;
+    canData.src = header.bus;
+    if (header.rejected) {
+      canData.src += CAN_REJECTED_BUS_OFFSET;
+    }
+    if (header.returned) {
+      canData.src += CAN_RETURNED_BUS_OFFSET;
+    }
+
+    canData.dat.assign((char *)&data[pos + sizeof(can_header)], data_len);
+
+    pos += sizeof(can_header) + data_len;
+  }
+
+  // move the overflowing data to the beginning of the buffer for the next round
+  memmove(data, &data[pos], size - pos);
+  size -= pos;
+
+  return true;
+}
+
+void pack_can_buffer(const capnp::List<cereal::CanData>::Reader &can_data_list,
+                            std::function<void(uint8_t *, size_t)> write_func) {
+  int32_t pos = 0;
+  uint8_t send_buf[2 * USB_TX_SOFT_LIMIT];
+
+  for (auto cmsg : can_data_list) {
+    // check if the message is intended for this panda
+    uint8_t bus = cmsg.getSrc();
+    auto can_data = cmsg.getDat();
+    uint8_t data_len_code = len_to_dlc(can_data.size());
+    assert(can_data.size() <= 64);
+    assert(can_data.size() == dlc_to_len[data_len_code]);
+
+    can_header header = {};
+    header.addr = cmsg.getAddress();
+    header.extended = (cmsg.getAddress() >= 0x800) ? 1 : 0;
+    header.data_len_code = data_len_code;
+    header.bus = bus;
+    header.checksum = 0;
+
+    memcpy(&send_buf[pos], (uint8_t *)&header, sizeof(can_header));
+    memcpy(&send_buf[pos + sizeof(can_header)], (uint8_t *)can_data.begin(), can_data.size());
+    uint32_t msg_size = sizeof(can_header) + can_data.size();
+
+    // set checksum
+    ((can_header *) &send_buf[pos])->checksum = calculate_checksum(&send_buf[pos], msg_size);
+
+    pos += msg_size;
+
+    if (pos >= USB_TX_SOFT_LIMIT) {
+      write_func(send_buf, pos);
+      pos = 0;
+    }
+  }
+
+  // send remaining packets
+  if (pos > 0) write_func(send_buf, pos);
+}
+
 int PandaFakeHandle::bulk_write(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout) {
+    printf("Write request: %02x \n", endpoint);
+    std::vector<can_frame> output;
+    this->unpack_can_buffer(data, length, output);
+    for(const can_frame &frame: output) {
+        printf("Address %ld: ", frame.address);
+        for(const char &byte: frame.dat){
+            printf("%02x ", byte);
+        }
+        printf("\n");
+    }
     return length;
 }
 
 int PandaFakeHandle::bulk_read(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout) {
-    return length;
+    printf("Read request: %02x\n", endpoint);
+    std::vector<cerial::CanData> input;
+    auto msg = input.emplace_back();
+    msg.busTime = 0;
+    msg.address = 0x7df;
+    msg.src = 0;
+    msg.dat = {0x00};
+    char len = 0;
+    pack_can_buffer(input, [=](uint8_t* packed, size_t write) {
+       len = write;
+       memcpy(data, packed, write);
+    })
+    return len;
 }
