@@ -426,6 +426,17 @@ int PandaFakeHandle::control_read(uint8_t bRequest, uint16_t wValue, uint16_t wI
     return wLength;
 }
 
+struct __attribute__((packed)) can_header {
+  uint8_t reserved : 1;
+  uint8_t bus : 3;
+  uint8_t data_len_code : 4;
+  uint8_t rejected : 1;
+  uint8_t returned : 1;
+  uint8_t extended : 1;
+  uint32_t addr : 29;
+  uint8_t checksum : 8;
+};
+
 struct can_frame {
   long address;
   std::string dat;
