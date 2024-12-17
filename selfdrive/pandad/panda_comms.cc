@@ -1,5 +1,6 @@
 #include "panda_comms.h"
 #include "selfdrive/pandad/panda.h"
+#include "panda/board/can.h"
 #include "common/util.h"
 
 #include <cassert>
@@ -444,7 +445,15 @@ struct can_frame {
   long src;
 };
 
-bool PandaFakeHandle::unpack_can_buffer(uint8_t *data, uint32_t &size, std::vector<can_frame> &out_vec) {
+uint8_t Panda::calculate_checksum(uint8_t *data, uint32_t len) {
+  uint8_t checksum = 0U;
+  for (uint32_t i = 0U; i < len; i++) {
+    checksum ^= data[i];
+  }
+  return checksum;
+}
+
+bool unpack_can_buffer(uint8_t *data, uint32_t &size, std::vector<can_frame> &out_vec) {
   int pos = 0;
 
   while (pos <= size - sizeof(can_header)) {
@@ -460,7 +469,6 @@ bool PandaFakeHandle::unpack_can_buffer(uint8_t *data, uint32_t &size, std::vect
     if (calculate_checksum(&data[pos], sizeof(can_header) + data_len) != 0) {
       LOGE("Panda CAN checksum failed");
       size = 0;
-      can_reset_communications();
       return false;
     }
 
