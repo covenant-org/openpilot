@@ -426,6 +426,13 @@ int PandaFakeHandle::control_read(uint8_t bRequest, uint16_t wValue, uint16_t wI
     return wLength;
 }
 
+struct can_frame {
+  long address;
+  std::string dat;
+  long busTime;
+  long src;
+};
+
 bool PandaFakeHandle::unpack_can_buffer(uint8_t *data, uint32_t &size, std::vector<can_frame> &out_vec) {
   int pos = 0;
 
