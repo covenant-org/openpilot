@@ -1,4 +1,5 @@
 #include "panda_comms.h"
+#include "panda.h"
 #include "selfdrive/pandad/panda.h"
 #include "common/util.h"
 
@@ -7,6 +8,7 @@
 #include <cstdio>
 #include <stdexcept>
 #include <memory>
+#include <unistd.h>
 
 #include "common/swaglog.h"
 
@@ -476,51 +478,42 @@ bool unpack_can_buffer(uint8_t *data, uint32_t &size, std::vector<can_frame> &ou
   return true;
 }
 
-void pack_can_buffer(const capnp::List<cereal::CanData>::Reader &can_data_list,
-                            std::function<void(uint8_t *, size_t)> write_func) {
-  int32_t pos = 0;
-  uint8_t send_buf[2 * USB_TX_SOFT_LIMIT];
+static uint8_t len_to_dlc(uint8_t len) {
+  if (len <= 8) {
+    return len;
+  }
+  if (len <= 24) {
+    return 8 + ((len - 8) / 4) + ((len % 4) ? 1 : 0);
+  } else {
+    return 11 + (len / 16) + ((len % 16) ? 1 : 0);
+  }
+}
 
-  for (auto cmsg : can_data_list) {
-    // check if the message is intended for this panda
-    uint8_t bus = cmsg.getSrc();
-    auto can_data = cmsg.getDat();
-    uint8_t data_len_code = len_to_dlc(can_data.size());
-    assert(can_data.size() <= 64);
-    assert(can_data.size() == dlc_to_len[data_len_code]);
-
+uint32_t pack_can_msg(uint8_t bus, uint32_t address, const std::vector<uint8_t> &data, unsigned char *buf) {
+    uint8_t buffer[2*USB_TX_SOFT_LIMIT];
     can_header header = {};
-    header.addr = cmsg.getAddress();
-    header.extended = (cmsg.getAddress() >= 0x800) ? 1 : 0;
-    header.data_len_code = data_len_code;
+    uint8_t len_code = len_to_dlc(data.size());
+    header.addr = address;
+    header.extended = address > 0x7FF;
+    header.data_len_code = len_code;
     header.bus = bus;
     header.checksum = 0;
 
-    memcpy(&send_buf[pos], (uint8_t *)&header, sizeof(can_header));
-    memcpy(&send_buf[pos + sizeof(can_header)], (uint8_t *)can_data.begin(), can_data.size());
-    uint32_t msg_size = sizeof(can_header) + can_data.size();
-
-    // set checksum
-    ((can_header *) &send_buf[pos])->checksum = calculate_checksum(&send_buf[pos], msg_size);
-
-    pos += msg_size;
-
-    if (pos >= USB_TX_SOFT_LIMIT) {
-      write_func(send_buf, pos);
-      pos = 0;
-    }
-  }
-
-  // send remaining packets
-  if (pos > 0) write_func(send_buf, pos);
+    memcpy(&buffer[0], (uint8_t *)&header, sizeof(can_header));
+    memcpy(&buffer[sizeof(can_header)], (uint8_t *)data.data(), data.size());
+    uint32_t msg_size = sizeof(can_header) + data.size();
+    ((can_header *)&buffer[0])->checksum = calculate_checksum(&buffer[0], msg_size);
+    memcpy(buf, &buffer[0], msg_size);
+    return msg_size;
 }
 
 int PandaFakeHandle::bulk_write(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout) {
     printf("Write request: %02x \n", endpoint);
     std::vector<can_frame> output;
-    this->unpack_can_buffer(data, length, output);
+    uint32_t size = (uint32_t) length;
+    unpack_can_buffer(data, size, output);
     for(const can_frame &frame: output) {
-        printf("Address %ld: ", frame.address);
+        printf("Address %02lx: ", frame.address);
         for(const char &byte: frame.dat){
             printf("%02x ", byte);
         }
@@ -531,16 +524,7 @@ int PandaFakeHandle::bulk_write(unsigned char endpoint, unsigned char* data, int
 
 int PandaFakeHandle::bulk_read(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout) {
     printf("Read request: %02x\n", endpoint);
-    capnp::FlatArrayMessaggeBuilder builder;
-    capnp::List<cerial::CanData>::Builder input = builder.initRoot<capnp::List<cereal::CanData>>(1);
-    auto msg = input[0];
-    msg.setBusTime(0);
-    msg.setAddress(0x7df);
-    msg.setSrc(0);
-    char len = 0;
-    pack_can_buffer(input, [&](uint8_t* packed, size_t write) {
-       len = write;
-       memcpy(data, packed, write);
-    })
-    return len;
+    sleep(1);
+    std::vector<uint8_t> content = {0};
+    return pack_can_msg(0, 0xFD, content, data);
 }

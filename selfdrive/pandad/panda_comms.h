@@ -100,7 +100,6 @@ public:
   int bulk_write(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout=TIMEOUT);
   int bulk_read(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout=TIMEOUT);
   void cleanup(){};
-  bool unpack_can_buffer(uint8_t *data, uint32_t &length, std::vector<can_frame> &output);
 
   static std::vector<std::string> list();
 
