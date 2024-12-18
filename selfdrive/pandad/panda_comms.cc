@@ -531,14 +531,14 @@ int PandaFakeHandle::bulk_write(unsigned char endpoint, unsigned char* data, int
 
 int PandaFakeHandle::bulk_read(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout) {
     printf("Read request: %02x\n", endpoint);
-    std::vector<cerial::CanData> input;
-    auto msg = input.emplace_back();
-    msg.busTime = 0;
-    msg.address = 0x7df;
-    msg.src = 0;
-    msg.dat = {0x00};
+    capnp::FlatArrayMessaggeBuilder builder;
+    capnp::List<cerial::CanData>::Builder input = builder.initRoot<capnp::List<cereal::CanData>>(1);
+    auto msg = input[0];
+    msg.setBusTime(0);
+    msg.setAddress(0x7df);
+    msg.setSrc(0);
     char len = 0;
-    pack_can_buffer(input, [=](uint8_t* packed, size_t write) {
+    pack_can_buffer(input, [&](uint8_t* packed, size_t write) {
        len = write;
        memcpy(data, packed, write);
     })
