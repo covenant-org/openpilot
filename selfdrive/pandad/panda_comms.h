@@ -111,6 +111,7 @@ private:
   uint16_t fan_speed = 0;
   uint16_t ir_pwr = 0;
   uint16_t loopback = 0;
+  uint32_t ecu_add = 0x722;
   bool deepsleep = 0;
   bool engaged = 0;
   bool power_saving = 0;

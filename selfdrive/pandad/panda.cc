@@ -127,7 +127,6 @@ std::optional<std::vector<uint8_t>> Panda::get_firmware_version() {
   std::vector<uint8_t> fw_sig_buf(128);
   int read_1 = handle->control_read(0xd3, 0, 0, &fw_sig_buf[0], 64);
   int read_2 = handle->control_read(0xd4, 0, 0, &fw_sig_buf[64], 64);
-  LOGW("fw %s", std::string(fw_sig_buf.begin(), fw_sig_buf.end()).c_str());
   return ((read_1 == 64) && (read_2 == 64)) ? std::make_optional(fw_sig_buf) : std::nullopt;
 }
 

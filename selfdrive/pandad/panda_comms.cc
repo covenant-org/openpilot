@@ -4,11 +4,16 @@
 #include "common/util.h"
 
 #include <cassert>
+#include <chrono>
+#include <cmath>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <mutex>
 #include <stdexcept>
 #include <memory>
+#include <tuple>
 #include <unistd.h>
 
 #include "common/swaglog.h"
@@ -508,13 +513,68 @@ uint32_t pack_can_msg(uint8_t bus, uint32_t address, const std::string &data, un
     return msg_size;
 }
 
+#define CAN_MAX_DATA_SIZE 8
+#define ISOTP_SINGLE_FRAME 0
+#define ISOTP_FIRST_FRAME 1
+#define ISOTP_CONT_FRAME 2
+
+uint32_t to_isotp_frame(const std::string &response_code, const std::string &data, std::vector<std::string> &segments){
+    size_t total_data_len = response_code.size() + data.size();
+    if(total_data_len < CAN_MAX_DATA_SIZE){
+        char type_and_len = (ISOTP_SINGLE_FRAME << 4) | total_data_len;
+        std::string& segment = segments.emplace_back();
+        segment.resize(sizeof(type_and_len) + total_data_len);
+        memcpy(segment.data(), &type_and_len, sizeof(type_and_len));
+        memcpy(segment.data() + sizeof(type_and_len), &response_code, sizeof(response_code));
+        memcpy(segment.data() + sizeof(response_code) + sizeof(type_and_len), data.data(), data.size());
+        return 1;
+    }
+    std::string full_msg = std::string(response_code);
+    full_msg.append(data);
+    size_t current_pos = 0;
+    char packet_idx = 0;
+    size_t offset = 0;
+    size_t segment_size = 0;
+    while (current_pos < full_msg.size()){
+        std::string &segment = segments.emplace_back();
+        printf("Segment %d\n", packet_idx);
+        if(current_pos == 0){
+            segment_size = CAN_MAX_DATA_SIZE;
+            segment.resize(segment_size);
+            segment[0] = (char) (ISOTP_FIRST_FRAME << 4) | ((total_data_len & 0xF00) >> 8);
+            segment[1] = (char) (total_data_len & 0xFF);
+            offset = 2;
+        }else{
+            packet_idx++;
+            segment_size = full_msg.size() - current_pos + 1;
+            if(segment_size > CAN_MAX_DATA_SIZE){
+                segment_size = CAN_MAX_DATA_SIZE;
+            }
+            segment.resize(segment_size);
+            segment[0] = (char) (ISOTP_CONT_FRAME << 4) | (packet_idx & 0xF);
+            offset = 1;
+        }
+        char bytes_to_copy = segment_size - offset;
+        memcpy(segment.data() + offset, full_msg.data() + current_pos, bytes_to_copy);
+        current_pos += bytes_to_copy;
+    }
+    return packet_idx;
+}
+
 int PandaFakeHandle::bulk_write(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout) {
-    printf("Write request: %02x \n", endpoint);
     std::vector<can_frame> output;
     uint32_t size = (uint32_t) length;
     unpack_can_buffer(data, size, output);
     for(const can_frame &frame: output) {
         printf("Address %02lx: ", frame.address);
+        if(frame.address != 0x7DF) {
+            continue;
+        }
+        std::string frame_dat = frame.dat;
+        for(const uint8_t &byte: frame_dat) {
+            printf("%02x ", byte);
+        }
+        printf("\n");
         // IDK where this 0x03 is coming from
         /*
          *
@@ -524,18 +584,32 @@ class ISOTP_FRAME_TYPE(IntEnum):
   CONSECUTIVE = 2
   FLOW = 3
          */
-        if(byte[0] == 0x03) {
-           if(byte[1] == CANServiceTypes::READ_DATA_BY_IDENTIFIER) {
+        if(frame_dat[0] == 0x03) {
+           if(frame_dat[1] == CANServiceTypes::READ_DATA_BY_IDENTIFIER) {
                uint32_t identifier = 0;
-               for(size_t i=2; i< length; i++) {
+               for(size_t i=2; i< 4; i++) {
                    identifier <<= 8;
-                   identifier |= byte[i];
+                   identifier |= frame_dat[i];
                }
+               printf("Identifier: %u\n", identifier);
                if(identifier == CANIdentifiers::VIN){
                    {
                        std::lock_guard lk(this->msg_lock);
-                       this->msg_queue.emplace({0, frame.address + 0x8, frame.dat})
+                       printf("Sending VIN\n");
+                       std::string response_code = {CANServiceTypes::READ_DATA_BY_IDENTIFIER + 0x40, (char)((CANIdentifiers::VIN & 0xFF00) >> 8), (char)(CANIdentifiers::VIN & 0xFF)};
+                       std::vector<std::string> segments;
+                       to_isotp_frame(response_code, this->vin, segments);
+                       printf("Segements %lu \n", segments.size());
+                       for(const std::string&segment: segments){
+                            printf("Segement: ");
+                           for(const char&byte: segment){
+                               printf("%02x ", byte);
+                           }
+                           printf("\n");
+                           this->msg_queue.emplace(std::make_tuple(0, 0x7e0+8, segment));
+                       }
                    }
+                   this->msg_cv.notify_one();
                }
            }
         }
@@ -546,7 +620,20 @@ class ISOTP_FRAME_TYPE(IntEnum):
 
 int PandaFakeHandle::bulk_read(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout) {
     printf("Read request: %02x\n", endpoint);
-    sleep(1);
-    std::vector<uint8_t> content = {0};
-    return pack_can_msg(0, 0xFD, content, data);
+    int total_read = 0;
+    std::unique_lock<std::mutex> lk(this->msg_lock);
+    this->msg_cv.wait_for(lk, std::chrono::milliseconds(100), [this] { return !this->msg_queue.empty(); });
+    while(lk.owns_lock() && !this->msg_queue.empty()){
+        std::tuple<uint8_t, uint32_t, std::string> msg = this->msg_queue.front();
+        if((std::get<2>(msg).size() + sizeof(can_header) + total_read) >= length){
+            break;
+        }
+        this->msg_queue.pop();
+        total_read += pack_can_msg(std::get<0>(msg), std::get<1>(msg), std::get<2>(msg), data + total_read);
+    }
+    if (total_read + sizeof(can_header) + 2 < length){
+      std::string content = {0, 0};
+      total_read += pack_can_msg(0, this->ecu_add+0x8, content, data + total_read);
+    }
+    return total_read;
 }
