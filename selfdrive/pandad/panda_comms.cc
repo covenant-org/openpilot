@@ -6,6 +6,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdio>
+#include <mutex>
 #include <stdexcept>
 #include <memory>
 #include <unistd.h>
@@ -489,7 +490,7 @@ static uint8_t len_to_dlc(uint8_t len) {
   }
 }
 
-uint32_t pack_can_msg(uint8_t bus, uint32_t address, const std::vector<uint8_t> &data, unsigned char *buf) {
+uint32_t pack_can_msg(uint8_t bus, uint32_t address, const std::string &data, unsigned char *buf) {
     uint8_t buffer[2*USB_TX_SOFT_LIMIT];
     can_header header = {};
     uint8_t len_code = len_to_dlc(data.size());
@@ -514,8 +515,29 @@ int PandaFakeHandle::bulk_write(unsigned char endpoint, unsigned char* data, int
     unpack_can_buffer(data, size, output);
     for(const can_frame &frame: output) {
         printf("Address %02lx: ", frame.address);
-        for(const char &byte: frame.dat){
-            printf("%02x ", byte);
+        // IDK where this 0x03 is coming from
+        /*
+         *
+class ISOTP_FRAME_TYPE(IntEnum):
+  SINGLE = 0
+  FIRST = 1
+  CONSECUTIVE = 2
+  FLOW = 3
+         */
+        if(byte[0] == 0x03) {
+           if(byte[1] == CANServiceTypes::READ_DATA_BY_IDENTIFIER) {
+               uint32_t identifier = 0;
+               for(size_t i=2; i< length; i++) {
+                   identifier <<= 8;
+                   identifier |= byte[i];
+               }
+               if(identifier == CANIdentifiers::VIN){
+                   {
+                       std::lock_guard lk(this->msg_lock);
+                       this->msg_queue.emplace({0, frame.address + 0x8, frame.dat})
+                   }
+               }
+           }
         }
         printf("\n");
     }

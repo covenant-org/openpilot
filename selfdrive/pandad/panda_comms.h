@@ -1,8 +1,10 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <mutex>
+#include <queue>
 #include <string>
 #include <vector>
 
@@ -117,6 +119,10 @@ private:
   uint16_t canfd[4] = {0, 0, 0, 0};
   uint32_t uptime = 0;
   bool ignited = 0;
+  std::string vin = "JH4DB1542MS007683";
+  std::queue<std::tuple<uint8_t, uint32_t, std::string>> msg_queue;
+  std::mutex msg_lock;
+  std::condition_variable msg_cv;
 };
 
 namespace PandaEndpoints{
@@ -145,6 +151,14 @@ namespace PandaEndpoints{
   static const unsigned char CAN_BULK_WRITE = 3;
   static const unsigned char CAN_JUNK_READ = 0xab;
   static const unsigned char CAN_BULK_READ = 0xa8;
+}
+
+namespace CANIdentifiers {
+static const uint32_t VIN = 0xF190;
+}
+
+namespace CANServiceTypes {
+  static const uint8_t READ_DATA_BY_IDENTIFIER = 0x22;
 }
 
 #endif
