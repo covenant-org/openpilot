@@ -595,11 +595,11 @@ int PandaFakeHandle::bulk_write(unsigned char endpoint, unsigned char* data, int
             }
         }
         if(frame_dat[1] == CANServiceTypes::TESTER_PRESENT){
-            std::string data = {0x01, CANServiceTypes::TESTER_PRESENT + 0x40};
-            data.resize(CAN_MAX_DATA_SIZE, 0);
+            std::string segment = {0x01, CANServiceTypes::TESTER_PRESENT + 0x40};
+            segment.resize(CAN_MAX_DATA_SIZE, 0);
             {
                 std::lock_guard lk(this->msg_lock);
-                this->msg_queue.emplace(std::make_tuple(0, this->ecu_add+8, data));
+                this->msg_queue.emplace(std::make_tuple(0, this->ecu_add+8, segment));
             }
             this->msg_cv.notify_one();
         }
