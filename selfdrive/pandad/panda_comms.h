@@ -160,6 +160,7 @@ static const uint32_t VIN = 0xF190;
 
 namespace CANServiceTypes {
   static const uint8_t READ_DATA_BY_IDENTIFIER = 0x22;
+  static const uint8_t TESTER_PRESENT = 0x3E;
 }
 
 #endif
