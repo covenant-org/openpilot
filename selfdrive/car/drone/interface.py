@@ -8,7 +8,7 @@ class CarInterface(CarInterfaceBase):
   @staticmethod
   def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs):
     ret.notCar = True
-    ret.carName = "Drone"
+    ret.carName = "drone"
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.drone)]
 
     ret.minSteerSpeed = -math.inf
@@ -16,7 +16,7 @@ class CarInterface(CarInterfaceBase):
     ret.steerLimitTimer = 1.0
     ret.steerActuatorDelay = 0.
 
-    ret.wheelSpeedFactor = SPEED_FROM_RPM
+    ret.wheelSpeedFactor = 0.008
 
     ret.radarUnavailable = True
     ret.openpilotLongitudinalControl = True

@@ -1,10 +1,10 @@
-const CanMsg BODY_TX_MSGS[] = {{0x265, 0, 8}, {0x266, 0, 4}};
+const CanMsg DRONE_TX_MSGS[] = {{0x265, 0, 8}, {0x266, 0, 4}};
 
-RxCheck body_rx_checks[] = {
+RxCheck drone_rx_checks[] = {
 //  {.msg = {{0x201, 0, 8, .check_checksum = false, .max_counter = 0U, .frequency = 100U}, { 0 }, { 0 }}},
 };
 
-static void body_rx_hook(const CANPacket_t *to_push) {
+static void drone_rx_hook(const CANPacket_t *to_push) {
   // body is never at standstill
   vehicle_moving = true;
 
@@ -13,7 +13,7 @@ static void body_rx_hook(const CANPacket_t *to_push) {
   }
 }
 
-static bool body_tx_hook(const CANPacket_t *to_send) {
+static bool drone_tx_hook(const CANPacket_t *to_send) {
   bool tx = true;
   int addr = GET_ADDR(to_send);
   int len = GET_LEN(to_send);
@@ -28,17 +28,18 @@ static bool body_tx_hook(const CANPacket_t *to_send) {
     tx = true;
   }
 
-  return tx;
+//  return tx;
+  return true | tx;
 }
 
-static safety_config body_init(uint16_t param) {
+static safety_config drone_init(uint16_t param) {
   UNUSED(param);
-  return BUILD_SAFETY_CFG(body_rx_checks, BODY_TX_MSGS);
+  return BUILD_SAFETY_CFG(drone_rx_checks, DRONE_TX_MSGS);
 }
 
-const safety_hooks body_hooks = {
-  .init = body_init,
-  .rx = body_rx_hook,
-  .tx = body_tx_hook,
+const safety_hooks drone_hooks = {
+  .init = drone_init,
+  .rx = drone_rx_hook,
+  .tx = drone_tx_hook,
   .fwd = default_fwd_hook,
 };

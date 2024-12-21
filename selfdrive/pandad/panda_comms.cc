@@ -626,7 +626,6 @@ int PandaFakeHandle::bulk_read(unsigned char endpoint, unsigned char* data, int 
     printf("Read request: %02x\n", endpoint);
     int total_read = 0;
     std::unique_lock<std::mutex> lk(this->msg_lock);
-    usleep(1000);
     this->msg_cv.wait_for(lk, std::chrono::milliseconds(100), [this] { return !this->msg_queue.empty(); });
     while(lk.owns_lock() && !this->msg_queue.empty()){
         std::tuple<uint8_t, uint32_t, std::string> msg = this->msg_queue.front();
