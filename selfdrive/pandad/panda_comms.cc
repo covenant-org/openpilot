@@ -593,16 +593,27 @@ int PandaFakeHandle::bulk_write(unsigned char endpoint, unsigned char* data, int
                 }
                 this->msg_cv.notify_one();
             }
+
+            if (identifier == CANIdentifiers::APPLICATION_SOFTWARE_IDENTIFICATION){
+                {
+                    std::lock_guard lk(this->msg_lock);
+                    std::string response_code = {CANServiceTypes::READ_DATA_BY_IDENTIFIER + 0x40, (char)((CANIdentifiers::APPLICATION_SOFTWARE_IDENTIFICATION & 0xFF00) >> 8), (char)(CANIdentifiers::APPLICATION_SOFTWARE_IDENTIFICATION & 0xFF)};
+                    std::vector<std::string> segments;
+                    to_isotp_frame(response_code, this->fw_version, segments);
+                    for(const std::string&segment: segments){
+                        this->msg_queue.emplace(std::make_tuple(0, this->ecu_add+8, segment));
+                    }
+                }
+                this->msg_cv.notify_one();
+
+            }
         }
         if(frame_dat[1] == CANServiceTypes::TESTER_PRESENT){
-            std::string response_code = {CANServiceTypes::TESTER_PRESENT + 0x40, 0x00};
-            std::vector<std::string> segments;
-            to_isotp_frame(response_code, this->fw_version, segments);
+            std::string segment = {0x02, CANServiceTypes::TESTER_PRESENT + 0x40, 0x00};
+            segment.resize(CAN_MAX_DATA_SIZE, 0);
             {
                 std::lock_guard lk(this->msg_lock);
-                for(const std::string&segment: segments){
-                    this->msg_queue.emplace(std::make_tuple(0, this->ecu_add+8, segment));
-                }
+                this->msg_queue.emplace(std::make_tuple(0, this->ecu_add+8, segment));
             }
             this->msg_cv.notify_one();
         }
@@ -628,5 +639,10 @@ int PandaFakeHandle::bulk_read(unsigned char endpoint, unsigned char* data, int 
       std::string content = {1, 1};
       total_read += pack_can_msg(0, this->ecu_add+0x8, content, data + total_read);
     }
+    printf("Response: ");
+    for(int i=0; i<total_read; i++){
+        printf("%02x ", data[i]);
+    }
+    printf("\n");
     return total_read;
 }
