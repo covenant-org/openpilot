@@ -121,6 +121,7 @@ private:
   uint32_t uptime = 0;
   bool ignited = 0;
   std::string vin = "JH4DB1542MS007683";
+  std::string fw_version = "ncl.0.01";
   std::queue<std::tuple<uint8_t, uint32_t, std::string>> msg_queue;
   std::mutex msg_lock;
   std::condition_variable msg_cv;
