@@ -19,7 +19,7 @@ class CarControllerParams:
 class CAR(Platforms):
   DRONE = PlatformConfig(
     [CarDocs("Nuclea drone", package="All")],
-    CarSpecs(mass=4, wheelbase=0.406, steerRatio=0.5),
+    CarSpecs(mass=4, wheelbase=0.406, steerRatio=0.5, centerToFrontRatio=0.44),
     dbc_dict('drone', None),
   )
 
