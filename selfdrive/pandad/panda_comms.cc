@@ -537,7 +537,6 @@ uint32_t to_isotp_frame(const std::string &response_code, const std::string &dat
     size_t segment_size = 0;
     while (current_pos < full_msg.size()){
         std::string &segment = segments.emplace_back();
-        printf("Segment %d\n", packet_idx);
         if(current_pos == 0){
             segment_size = CAN_MAX_DATA_SIZE;
             segment.resize(segment_size);
@@ -567,7 +566,7 @@ int PandaFakeHandle::bulk_write(unsigned char endpoint, unsigned char* data, int
     unpack_can_buffer(data, size, output);
     for(const can_frame &frame: output) {
         printf("Address %02lx: ", frame.address);
-        if(frame.address != 0x7DF) {
+        if(frame.address != 0x7DF && frame.address != this->ecu_add) {
             continue;
         }
         std::string frame_dat = frame.dat;
@@ -575,43 +574,34 @@ int PandaFakeHandle::bulk_write(unsigned char endpoint, unsigned char* data, int
             printf("%02x ", byte);
         }
         printf("\n");
-        // IDK where this 0x03 is coming from
-        /*
-         *
-class ISOTP_FRAME_TYPE(IntEnum):
-  SINGLE = 0
-  FIRST = 1
-  CONSECUTIVE = 2
-  FLOW = 3
-         */
-        if(frame_dat[0] == 0x03) {
-           if(frame_dat[1] == CANServiceTypes::READ_DATA_BY_IDENTIFIER) {
-               uint32_t identifier = 0;
-               for(size_t i=2; i< 4; i++) {
-                   identifier <<= 8;
-                   identifier |= frame_dat[i];
-               }
-               printf("Identifier: %u\n", identifier);
-               if(identifier == CANIdentifiers::VIN){
-                   {
-                       std::lock_guard lk(this->msg_lock);
-                       printf("Sending VIN\n");
-                       std::string response_code = {CANServiceTypes::READ_DATA_BY_IDENTIFIER + 0x40, (char)((CANIdentifiers::VIN & 0xFF00) >> 8), (char)(CANIdentifiers::VIN & 0xFF)};
-                       std::vector<std::string> segments;
-                       to_isotp_frame(response_code, this->vin, segments);
-                       printf("Segements %lu \n", segments.size());
-                       for(const std::string&segment: segments){
-                            printf("Segement: ");
-                           for(const char&byte: segment){
-                               printf("%02x ", byte);
-                           }
-                           printf("\n");
-                           this->msg_queue.emplace(std::make_tuple(0, 0x7e0+8, segment));
-                       }
-                   }
-                   this->msg_cv.notify_one();
-               }
-           }
+        char len = frame_dat[0] & 0x0F;
+        if(frame_dat[1] == CANServiceTypes::READ_DATA_BY_IDENTIFIER) {
+            uint32_t identifier = 0;
+            for(size_t i=2; i< 2+len-1; i++) {
+                identifier <<= 8;
+                identifier |= frame_dat[i];
+            }
+            if(identifier == CANIdentifiers::VIN){
+                {
+                    std::lock_guard lk(this->msg_lock);
+                    std::string response_code = {CANServiceTypes::READ_DATA_BY_IDENTIFIER + 0x40, (char)((CANIdentifiers::VIN & 0xFF00) >> 8), (char)(CANIdentifiers::VIN & 0xFF)};
+                    std::vector<std::string> segments;
+                    to_isotp_frame(response_code, this->vin, segments);
+                    for(const std::string&segment: segments){
+                        this->msg_queue.emplace(std::make_tuple(0, 0x7e0+8, segment));
+                    }
+                }
+                this->msg_cv.notify_one();
+            }
+        }
+        if(frame_dat[1] == CANServiceTypes::TESTER_PRESENT){
+            std::string data = {0x01, CANServiceTypes::TESTER_PRESENT + 0x40};
+            data.resize(CAN_MAX_DATA_SIZE, 0);
+            {
+                std::lock_guard lk(this->msg_lock);
+                this->msg_queue.emplace(std::make_tuple(0, this->ecu_add+8, data));
+            }
+            this->msg_cv.notify_one();
         }
         printf("\n");
     }
@@ -632,7 +622,7 @@ int PandaFakeHandle::bulk_read(unsigned char endpoint, unsigned char* data, int 
         total_read += pack_can_msg(std::get<0>(msg), std::get<1>(msg), std::get<2>(msg), data + total_read);
     }
     if (total_read + sizeof(can_header) + 2 < length){
-      std::string content = {0, 0};
+      std::string content = {1, 1};
       total_read += pack_can_msg(0, this->ecu_add+0x8, content, data + total_read);
     }
     return total_read;
