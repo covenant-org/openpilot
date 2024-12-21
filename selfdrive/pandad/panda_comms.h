@@ -157,6 +157,7 @@ namespace PandaEndpoints{
 
 namespace CANIdentifiers {
 static const uint32_t VIN = 0xF190;
+static const uint32_t APPLICATION_SOFTWARE_IDENTIFICATION = 0xF181;
 }
 
 namespace CANServiceTypes {

@@ -1,6 +1,6 @@
 # ruff: noqa: E501
 from cereal import car
-from openpilot.selfdrive.car.body.values import CAR
+from openpilot.selfdrive.car.drone.values import CAR
 
 Ecu = car.CarParams.Ecu
 
@@ -8,13 +8,13 @@ Ecu = car.CarParams.Ecu
 
 
 FINGERPRINTS = {
-  CAR.COMMA_BODY: [{
+  CAR.DRONE: [{
     613: 8, 614: 4
   }],
 }
 
 FW_VERSIONS = {
-  CAR.COMMA_BODY: {
+  CAR.DRONE: {
     (Ecu.engine, 0x722, None): [
       b'ncl.0.01',
     ],
