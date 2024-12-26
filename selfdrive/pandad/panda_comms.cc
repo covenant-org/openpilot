@@ -637,7 +637,7 @@ int PandaFakeHandle::bulk_read(unsigned char endpoint, unsigned char* data, int 
     }
     if (total_read + sizeof(can_header) + 2 < length){
       std::string content = {1, 1};
-      total_read += pack_can_msg(0, this->ecu_add+0x8, content, data + total_read);
+      total_read += pack_can_msg(0, 0x266, content, data + total_read);
     }
     printf("Response: ");
     for(int i=0; i<total_read; i++){
