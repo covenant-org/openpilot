@@ -3,7 +3,6 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
-#include <mavsdk/system.h>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -16,7 +15,7 @@
 
 #include <libusb-1.0/libusb.h>
 
-#include <mavsdk/mavsdk.h>
+#include "mavsdk/mavsdk.h"
 #include <mavsdk/plugins/action/action.h>
 #include <mavsdk/plugins/offboard/offboard.h>
 #include <mavsdk/plugins/telemetry/telemetry.h>
@@ -135,10 +134,10 @@ private:
 
   mavsdk::Mavsdk mavsdk;
   mavsdk::ConnectionResult mavsdk_connection_result;
-  std::shared_ptr<mavsdk::System> mavsdk_system;
-  mavsdk::Action mavsdk_action_plugin;
-  mavsdk::Offboard mavsdk_offboard_plugin;
-  mavsdk::Telemetry mavsdk_telemetry_plugin;
+  std::optional<std::shared_ptr<mavsdk::System>> mavsdk_system;
+  std::shared_ptr<mavsdk::Action> mavsdk_action_plugin;
+  std::shared_ptr<mavsdk::Offboard> mavsdk_offboard_plugin;
+  std::shared_ptr<mavsdk::Telemetry> mavsdk_telemetry_plugin;
 };
 
 namespace PandaEndpoints{
