@@ -255,9 +255,9 @@ PandaFakeHandle::PandaFakeHandle(std::string serial):
         LOGE("no autopilot found");
         throw std::runtime_error("no autopilot found");
     }
-    this->mavsdk_action_plugin = mavsdk::Action{this->mavsdk_system};
-    this->mavsdk_offboard_plugin = mavsdk::Offboard{this->mavsdk_system};
-    this->mavsdk_telemetry_plugin = mavsdk::Telemetry{this->mavsdk_system};
+    this->mavsdk_action_plugin = std::make_shared<mavsdk::Action>(this->mavsdk_system.value());
+    this->mavsdk_offboard_plugin = std::make_shared<mavsdk::Offboard>(this->mavsdk_system.value());
+    this->mavsdk_telemetry_plugin = std::make_shared<mavsdk::Telemetry>(this->mavsdk_system.value());
     this->hw_serial = serial;
 }
 
