@@ -1,5 +1,8 @@
 Import('env', 'envCython', 'common', 'messaging')
 
+env.AppendUnique(CPPPATH=['/data/MAVSDK/install/include'])
+env.AppendUnique(LIBPATH=['/data/MAVSDK/install/lib'])
+
 libs = ['usb-1.0', common, messaging, 'pthread']
 panda = env.Library('panda', ['panda.cc', 'panda_comms.cc', 'spi.cc'])
 

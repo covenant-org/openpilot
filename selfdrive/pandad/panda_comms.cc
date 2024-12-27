@@ -3,6 +3,7 @@
 #include "selfdrive/pandad/panda.h"
 #include "common/util.h"
 
+
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -10,6 +11,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <mavsdk/mavsdk.h>
+#include <mavsdk/system.h>
 #include <mutex>
 #include <stdexcept>
 #include <memory>
@@ -238,7 +241,23 @@ int PandaUsbHandle::bulk_read(unsigned char endpoint, unsigned char* data, int l
   return transferred;
 }
 
-PandaFakeHandle::PandaFakeHandle(std::string serial): PandaCommsHandle(serial) {
+PandaFakeHandle::PandaFakeHandle(std::string serial):
+    PandaCommsHandle(serial),
+    mavsdk{mavsdk::Mavsdk{mavsdk::Mavsdk::Configuration(mavsdk::Mavsdk::ComponentType::GroundStation)}} {
+    this->mavsdk_connection_result = this->mavsdk.add_any_connection("");
+    if(this->mavsdk_connection_result != mavsdk::ConnectionResult::Success) {
+        LOGE("mavsdk connection failed");
+        throw std::runtime_error("mavsdk connection failed");
+    }
+
+    this->mavsdk_system = this->mavsdk.first_autopilot(3.0);
+    if(!this->mavsdk_system) {
+        LOGE("no autopilot found");
+        throw std::runtime_error("no autopilot found");
+    }
+    this->mavsdk_action_plugin = mavsdk::Action{this->mavsdk_system};
+    this->mavsdk_offboard_plugin = mavsdk::Offboard{this->mavsdk_system};
+    this->mavsdk_telemetry_plugin = mavsdk::Telemetry{this->mavsdk_system};
     this->hw_serial = serial;
 }
 

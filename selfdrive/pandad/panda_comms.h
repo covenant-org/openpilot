@@ -3,6 +3,8 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
+#include <mavsdk/system.h>
+#include <memory>
 #include <mutex>
 #include <queue>
 #include <string>
@@ -13,6 +15,11 @@
 #endif
 
 #include <libusb-1.0/libusb.h>
+
+#include <mavsdk/mavsdk.h>
+#include <mavsdk/plugins/action/action.h>
+#include <mavsdk/plugins/offboard/offboard.h>
+#include <mavsdk/plugins/telemetry/telemetry.h>
 
 
 #define TIMEOUT 0
@@ -125,6 +132,13 @@ private:
   std::queue<std::tuple<uint8_t, uint32_t, std::string>> msg_queue;
   std::mutex msg_lock;
   std::condition_variable msg_cv;
+
+  mavsdk::Mavsdk mavsdk;
+  mavsdk::ConnectionResult mavsdk_connection_result;
+  std::shared_ptr<mavsdk::System> mavsdk_system;
+  mavsdk::Action mavsdk_action_plugin;
+  mavsdk::Offboard mavsdk_offboard_plugin;
+  mavsdk::Telemetry mavsdk_telemetry_plugin;
 };
 
 namespace PandaEndpoints{
