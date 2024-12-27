@@ -19,12 +19,17 @@ Panda::Panda(std::string serial, uint32_t bus_offset) : bus_offset(bus_offset) {
     handle = std::make_unique<PandaFakeHandle>(serial);
     LOGW("connected to %s over Fake", serial.c_str());
   } catch (std::exception &e) {
+      try{
+        handle = std::make_unique<PandaUsbHandle>(serial);
+        LOGW("connected to %s over USB", serial.c_str());
+      }catch(std::exception &e){
 #ifndef __APPLE__
-    handle = std::make_unique<PandaSpiHandle>(serial);
-    LOGW("connected to %s over SPI", serial.c_str());
+          handle = std::make_unique<PandaSpiHandle>(serial);
+          LOGW("connected to %s over SPI", serial.c_str());
 #else
-    throw e;
+          throw e;
 #endif
+      }
   }
 
   hw_type = get_hw_type();
