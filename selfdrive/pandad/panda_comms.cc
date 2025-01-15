@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstring>
 #include <mavsdk/mavsdk.h>
+#include <mavsdk/plugins/telemetry/telemetry.h>
 #include <mavsdk/system.h>
 #include <memory>
 #include <mutex>
@@ -282,7 +283,8 @@ bool PandaMavlinkHandle::connect_autopilot() {
   if (this->mavsdk_system.has_value()) {
     return true;
   }
-  if(this->hw_serial.rfind("udp", 0) != 0 && this->hw_serial.rfind("serial", 0) != 0){
+  if (this->hw_serial.rfind("udp", 0) != 0 &&
+      this->hw_serial.rfind("serial", 0) != 0) {
     return false;
   }
   printf("MAVSDK connectin to %s", this->hw_serial.c_str());
@@ -328,8 +330,8 @@ PandaMavlinkHandle::PandaMavlinkHandle(std::string serial)
       mavsdk{mavsdk::Mavsdk{mavsdk::Mavsdk::Configuration(
           mavsdk::Mavsdk::ComponentType::GroundStation)}} {
   this->hw_serial = serial;
-  if(!this->connect_autopilot()){
-      throw std::runtime_error("Failed to connect to autopilot");
+  if (!this->connect_autopilot()) {
+    throw std::runtime_error("Failed to connect to autopilot");
   }
 }
 
@@ -755,7 +757,22 @@ int PandaMavlinkHandle::bulk_read(unsigned char endpoint, unsigned char *data,
                                std::get<2>(msg), data + total_read);
   }
   if (total_read + sizeof(can_header) + 2 < length) {
-    std::string content = {1, 1};
+    mavsdk::Telemetry::VelocityBody velocity_body{
+        this->mavsdk_telemetry_messages.odometry.velocity_body};
+    float speed = std::sqrt(velocity_body.x_m_s * velocity_body.x_m_s +
+                            velocity_body.y_m_s * velocity_body.y_m_s);
+    uint16_t speed_mps = static_cast<uint16_t>(speed * 100);
+    float yaw_rate = this->mavsdk_telemetry_messages.odometry
+                         .angular_velocity_body.yaw_rad_s;
+    yaw_rate *= 180 / M_PI;
+    uint16_t yaw_rate_deg = static_cast<uint16_t>(yaw_rate * 10);
+    printf("Speed: %d m/s, Yaw rate: %d deg/s\n", speed_mps, yaw_rate_deg);
+    std::string content = {
+        (char)((yaw_rate_deg & 0xFF00) >> 8),
+        (char)(yaw_rate_deg & 0xFF),
+        (char)((speed_mps & 0xFF00) >> 8),
+        (char)(speed_mps & 0xFF),
+    };
     total_read += pack_can_msg(0, 0x266, content, data + total_read);
   }
   printf("Response: ");
