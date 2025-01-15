@@ -20,10 +20,8 @@
 #include <mavsdk/plugins/offboard/offboard.h>
 #include <mavsdk/plugins/telemetry/telemetry.h>
 
-
 #define TIMEOUT 0
 #define SPI_BUF_SIZE 2048
-
 
 // comms base class
 class PandaCommsHandle {
@@ -38,20 +36,30 @@ public:
   static std::vector<std::string> list();
 
   // HW communication
-  virtual int control_write(uint8_t request, uint16_t param1, uint16_t param2, unsigned int timeout=TIMEOUT) = 0;
-  virtual int control_read(uint8_t request, uint16_t param1, uint16_t param2, unsigned char *data, uint16_t length, unsigned int timeout=TIMEOUT) = 0;
-  virtual int bulk_write(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout=TIMEOUT) = 0;
-  virtual int bulk_read(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout=TIMEOUT) = 0;
+  virtual int control_write(uint8_t request, uint16_t param1, uint16_t param2,
+                            unsigned int timeout = TIMEOUT) = 0;
+  virtual int control_read(uint8_t request, uint16_t param1, uint16_t param2,
+                           unsigned char *data, uint16_t length,
+                           unsigned int timeout = TIMEOUT) = 0;
+  virtual int bulk_write(unsigned char endpoint, unsigned char *data,
+                         int length, unsigned int timeout = TIMEOUT) = 0;
+  virtual int bulk_read(unsigned char endpoint, unsigned char *data, int length,
+                        unsigned int timeout = TIMEOUT) = 0;
 };
 
 class PandaUsbHandle : public PandaCommsHandle {
 public:
   PandaUsbHandle(std::string serial);
   ~PandaUsbHandle();
-  int control_write(uint8_t request, uint16_t param1, uint16_t param2, unsigned int timeout=TIMEOUT);
-  int control_read(uint8_t request, uint16_t param1, uint16_t param2, unsigned char *data, uint16_t length, unsigned int timeout=TIMEOUT);
-  int bulk_write(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout=TIMEOUT);
-  int bulk_read(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout=TIMEOUT);
+  int control_write(uint8_t request, uint16_t param1, uint16_t param2,
+                    unsigned int timeout = TIMEOUT);
+  int control_read(uint8_t request, uint16_t param1, uint16_t param2,
+                   unsigned char *data, uint16_t length,
+                   unsigned int timeout = TIMEOUT);
+  int bulk_write(unsigned char endpoint, unsigned char *data, int length,
+                 unsigned int timeout = TIMEOUT);
+  int bulk_read(unsigned char endpoint, unsigned char *data, int length,
+                unsigned int timeout = TIMEOUT);
   void cleanup();
 
   static std::vector<std::string> list();
@@ -75,10 +83,15 @@ class PandaSpiHandle : public PandaCommsHandle {
 public:
   PandaSpiHandle(std::string serial);
   ~PandaSpiHandle();
-  int control_write(uint8_t request, uint16_t param1, uint16_t param2, unsigned int timeout=TIMEOUT);
-  int control_read(uint8_t request, uint16_t param1, uint16_t param2, unsigned char *data, uint16_t length, unsigned int timeout=TIMEOUT);
-  int bulk_write(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout=TIMEOUT);
-  int bulk_read(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout=TIMEOUT);
+  int control_write(uint8_t request, uint16_t param1, uint16_t param2,
+                    unsigned int timeout = TIMEOUT);
+  int control_read(uint8_t request, uint16_t param1, uint16_t param2,
+                   unsigned char *data, uint16_t length,
+                   unsigned int timeout = TIMEOUT);
+  int bulk_write(unsigned char endpoint, unsigned char *data, int length,
+                 unsigned int timeout = TIMEOUT);
+  int bulk_read(unsigned char endpoint, unsigned char *data, int length,
+                unsigned int timeout = TIMEOUT);
   void cleanup(){};
 
   static std::vector<std::string> list();
@@ -89,25 +102,41 @@ private:
   uint8_t rx_buf[SPI_BUF_SIZE];
   inline static std::recursive_mutex hw_lock;
 
-  int wait_for_ack(uint8_t ack, uint8_t tx, unsigned int timeout, unsigned int length);
-  int bulk_transfer(uint8_t endpoint, uint8_t *tx_data, uint16_t tx_len, uint8_t *rx_data, uint16_t rx_len, unsigned int timeout);
-  int spi_transfer(uint8_t endpoint, uint8_t *tx_data, uint16_t tx_len, uint8_t *rx_data, uint16_t max_rx_len, unsigned int timeout);
-  int spi_transfer_retry(uint8_t endpoint, uint8_t *tx_data, uint16_t tx_len, uint8_t *rx_data, uint16_t max_rx_len, unsigned int timeout);
+  int wait_for_ack(uint8_t ack, uint8_t tx, unsigned int timeout,
+                   unsigned int length);
+  int bulk_transfer(uint8_t endpoint, uint8_t *tx_data, uint16_t tx_len,
+                    uint8_t *rx_data, uint16_t rx_len, unsigned int timeout);
+  int spi_transfer(uint8_t endpoint, uint8_t *tx_data, uint16_t tx_len,
+                   uint8_t *rx_data, uint16_t max_rx_len, unsigned int timeout);
+  int spi_transfer_retry(uint8_t endpoint, uint8_t *tx_data, uint16_t tx_len,
+                         uint8_t *rx_data, uint16_t max_rx_len,
+                         unsigned int timeout);
   int lltransfer(spi_ioc_transfer &t);
 
   spi_header header;
   uint32_t xfer_count = 0;
 };
 
-class PandaFakeHandle : public PandaCommsHandle {
+struct TelemetryMessages {
+  mavsdk::Telemetry::Odometry odometry;
+  mavsdk::Telemetry::PositionVelocityNed position_velocity_ned;
+  mavsdk::Telemetry::Position position;
+};
+
+class PandaMavlinkHandle : public PandaCommsHandle {
 public:
-  PandaFakeHandle(std::string serial);
-  ~PandaFakeHandle();
-  int control_write(uint8_t request, uint16_t param1, uint16_t param2, unsigned int timeout=TIMEOUT);
-  int control_read(uint8_t request, uint16_t param1, uint16_t param2, unsigned char *data, uint16_t length, unsigned int timeout=TIMEOUT);
-  int bulk_write(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout=TIMEOUT);
-  int bulk_read(unsigned char endpoint, unsigned char* data, int length, unsigned int timeout=TIMEOUT);
-  void cleanup(){};
+  PandaMavlinkHandle(std::string serial);
+  ~PandaMavlinkHandle();
+  int control_write(uint8_t request, uint16_t param1, uint16_t param2,
+                    unsigned int timeout = TIMEOUT);
+  int control_read(uint8_t request, uint16_t param1, uint16_t param2,
+                   unsigned char *data, uint16_t length,
+                   unsigned int timeout = TIMEOUT);
+  int bulk_write(unsigned char endpoint, unsigned char *data, int length,
+                 unsigned int timeout = TIMEOUT);
+  int bulk_read(unsigned char endpoint, unsigned char *data, int length,
+                unsigned int timeout = TIMEOUT);
+  void cleanup() {};
 
   static std::vector<std::string> list();
 
@@ -138,44 +167,47 @@ private:
   std::shared_ptr<mavsdk::Action> mavsdk_action_plugin;
   std::shared_ptr<mavsdk::Offboard> mavsdk_offboard_plugin;
   std::shared_ptr<mavsdk::Telemetry> mavsdk_telemetry_plugin;
+  TelemetryMessages mavsdk_telemetry_messages;
+
+  bool connect_autopilot();
 };
 
-namespace PandaEndpoints{
-  static const uint8_t SET_SAFETY_MODEL = 0xdc;
-  static const uint8_t SET_ALTERNATIVE_EXPERIENCE = 0xdf;
-  static const uint8_t SET_FAN_SPEED = 0xb1;
-  static const uint8_t SET_IR_PWR = 0xb0;
-  static const uint8_t SET_LOOPBACK = 0xe5;
-  static const uint8_t SET_POWER_SAVING = 0xe7;
-  static const uint8_t SET_CAN_SPEED = 0xde;
-  static const uint8_t SET_DATA_SPEED = 0xf9;
-  static const uint8_t SET_CANFD_NON_ISO = 0xfc;
+namespace PandaEndpoints {
+static const uint8_t SET_SAFETY_MODEL = 0xdc;
+static const uint8_t SET_ALTERNATIVE_EXPERIENCE = 0xdf;
+static const uint8_t SET_FAN_SPEED = 0xb1;
+static const uint8_t SET_IR_PWR = 0xb0;
+static const uint8_t SET_LOOPBACK = 0xe5;
+static const uint8_t SET_POWER_SAVING = 0xe7;
+static const uint8_t SET_CAN_SPEED = 0xde;
+static const uint8_t SET_DATA_SPEED = 0xf9;
+static const uint8_t SET_CANFD_NON_ISO = 0xfc;
 
-  static const uint8_t CAN_RESET_COMMS = 0xc0;
+static const uint8_t CAN_RESET_COMMS = 0xc0;
 
-  static const uint8_t ENABLE_DEEPSLEEP = 0xfb;
-  static const uint8_t SEND_HEARTBEAT = 0xf3;
+static const uint8_t ENABLE_DEEPSLEEP = 0xfb;
+static const uint8_t SEND_HEARTBEAT = 0xf3;
 
-  static const uint8_t GET_HW_TYPE = 0xc1;
-  static const uint8_t GET_FAN_SPEED = 0xb2;
-  static const uint8_t GET_STATE= 0xd2;
-  static const uint8_t GET_CAN_STATE= 0xc2;
-  static const uint8_t GET_FIRMWARE_VERSION_FIST = 0xd3;
-  static const uint8_t GET_FIRMWARE_VERSION_SECOND = 0xd4;
+static const uint8_t GET_HW_TYPE = 0xc1;
+static const uint8_t GET_FAN_SPEED = 0xb2;
+static const uint8_t GET_STATE = 0xd2;
+static const uint8_t GET_CAN_STATE = 0xc2;
+static const uint8_t GET_FIRMWARE_VERSION_FIRST = 0xd3;
+static const uint8_t GET_FIRMWARE_VERSION_SECOND = 0xd4;
 
-  static const unsigned char CAN_BULK_WRITE = 3;
-  static const unsigned char CAN_JUNK_READ = 0xab;
-  static const unsigned char CAN_BULK_READ = 0xa8;
-}
+static const unsigned char CAN_BULK_WRITE = 3;
+static const unsigned char CAN_JUNK_READ = 0xab;
+static const unsigned char CAN_BULK_READ = 0xa8;
+} // namespace PandaEndpoints
 
 namespace CANIdentifiers {
 static const uint32_t VIN = 0xF190;
 static const uint32_t APPLICATION_SOFTWARE_IDENTIFICATION = 0xF181;
-}
+} // namespace CANIdentifiers
 
 namespace CANServiceTypes {
-  static const uint8_t READ_DATA_BY_IDENTIFIER = 0x22;
-  static const uint8_t TESTER_PRESENT = 0x3E;
-}
+static const uint8_t READ_DATA_BY_IDENTIFIER = 0x22;
+static const uint8_t TESTER_PRESENT = 0x3E;
+} // namespace CANServiceTypes
 
 #endif

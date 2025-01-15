@@ -16,7 +16,7 @@ const bool PANDAD_MAXOUT = getenv("PANDAD_MAXOUT") != nullptr;
 Panda::Panda(std::string serial, uint32_t bus_offset) : bus_offset(bus_offset) {
   // try USB first, then SPI
   try {
-    handle = std::make_unique<PandaFakeHandle>(serial);
+    handle = std::make_unique<PandaMavlinkHandle>(serial);
     LOGW("connected to %s over Fake", serial.c_str());
   } catch (std::exception &e) {
       try{
@@ -49,7 +49,7 @@ std::string Panda::hw_serial() {
 }
 
 std::vector<std::string> Panda::list(bool usb_only) {
-  std::vector<std::string> serials = PandaUsbHandle::list();
+  std::vector<std::string> serials = PandaMavlinkHandle::list();
 
 #ifndef __APPLE__
   if (!usb_only) {
