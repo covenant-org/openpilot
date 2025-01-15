@@ -292,7 +292,6 @@ bool PandaMavlinkHandle::connect_autopilot() {
     LOGE("MAVSDK: connection failed");
     return false;
   }
-  return true;
 
   this->mavsdk_system = this->mavsdk.first_autopilot(3.0);
   if (!this->mavsdk_system) {
@@ -339,7 +338,7 @@ PandaMavlinkHandle::~PandaMavlinkHandle() { this->connected = false; }
 std::vector<std::string> PandaMavlinkHandle::list() {
   std::vector<std::string> serials;
   std::string uri = "serial:///dev/ttyUSB0:57600";
-  char *env_uri = std::getenv("MAVSDK_CONNECTION_URI");
+  char *env_uri = std::getenv("MAVLINK_CONNECTION_URI");
   if (env_uri != nullptr) {
     uri = std::string(env_uri);
   }
