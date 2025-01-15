@@ -324,14 +324,16 @@ PandaMavlinkHandle::PandaMavlinkHandle(std::string serial)
       mavsdk{mavsdk::Mavsdk{mavsdk::Mavsdk::Configuration(
           mavsdk::Mavsdk::ComponentType::GroundStation)}} {
   this->hw_serial = serial;
-  this->connect_autopilot();
+  if(!this->connect_autopilot()){
+      throw std::runtime_error("Failed to connect to autopilot");
+  }
 }
 
 PandaMavlinkHandle::~PandaMavlinkHandle() { this->connected = false; }
 
 std::vector<std::string> PandaMavlinkHandle::list() {
   std::vector<std::string> serials;
-  std::string uri = "serial:///dev/ttyUSB0:57600";
+  std::string uri = "serial://dev/ttyUSB0:57600";
   char *env_uri = std::getenv("MAVSDK_CONNECTION_URI");
   if (env_uri != nullptr) {
     uri = std::string(env_uri);
