@@ -133,7 +133,7 @@ def main() -> None:
       # * then sort by hardware type
       # * as a last resort, sort by serial number
       pandas.sort(key=lambda x: (not x.is_internal(), x.get_type(), x.get_usb_serial()))
-      panda_serials = [os.getenv("MAVLINK_CONNECTION_URI") or "serial://dev/ttyUSB0:57600"] + [p.get_usb_serial() for p in pandas]
+      panda_serials = [os.getenv("MAVLINK_CONNECTION_URI") or "serial:///dev/ttyUSB0:57600"] + [p.get_usb_serial() for p in pandas]
 
       # log panda fw versions
       params.put("PandaSignatures", b','.join(p.get_signature() for p in pandas))
