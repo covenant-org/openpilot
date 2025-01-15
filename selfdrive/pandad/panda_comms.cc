@@ -338,7 +338,7 @@ PandaMavlinkHandle::~PandaMavlinkHandle() { this->connected = false; }
 
 std::vector<std::string> PandaMavlinkHandle::list() {
   std::vector<std::string> serials;
-  std::string uri = "serial://dev/ttyUSB0:57600";
+  std::string uri = "serial:///dev/ttyUSB0:57600";
   char *env_uri = std::getenv("MAVSDK_CONNECTION_URI");
   if (env_uri != nullptr) {
     uri = std::string(env_uri);
