@@ -292,6 +292,7 @@ bool PandaMavlinkHandle::connect_autopilot() {
     LOGE("MAVSDK: connection failed");
     return false;
   }
+  return true;
 
   this->mavsdk_system = this->mavsdk.first_autopilot(3.0);
   if (!this->mavsdk_system) {
