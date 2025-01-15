@@ -395,7 +395,8 @@ class Panda:
 
   @classmethod
   def list(cls):
-    ret = cls.usb_list()
+    ret = [os.getenv("MAVSDK_CONNECTION_URI")]
+    ret += cls.usb_list()
     ret += cls.spi_list()
     return list(set(ret))
 
