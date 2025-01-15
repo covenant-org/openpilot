@@ -282,6 +282,10 @@ bool PandaMavlinkHandle::connect_autopilot() {
   if (this->mavsdk_system.has_value()) {
     return true;
   }
+  if(this->hw_serial.rfind("udp", 0) != 0 && this->hw_serial.rfind("serial", 0) != 0){
+    return false;
+  }
+  printf("MAVSDK connectin to %s", this->hw_serial.c_str());
   this->mavsdk_connection_result =
       this->mavsdk.add_any_connection(this->hw_serial);
   if (this->mavsdk_connection_result != mavsdk::ConnectionResult::Success) {
