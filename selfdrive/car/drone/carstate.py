@@ -10,12 +10,10 @@ class CarState(CarStateBase):
     ret = car.CarState.new_message()
     print(cp.vl['DRONE_DATA'])
 
-#    ret.wheelSpeeds.fl = cp.vl['MOTORS_DATA']['SPEED_L']
-#    ret.wheelSpeeds.fr = cp.vl['MOTORS_DATA']['SPEED_R']
+    ret.vEgoRaw = cp.vl['DRONE_DATA']['SPEED']
+    ret.cruiseState.speed = cp.vl['DRONE_DATA']['SPEED']
 #
-#    ret.vEgoRaw = ((ret.wheelSpeeds.fl + ret.wheelSpeeds.fr) / 2.) * self.CP.wheelSpeedFactor
-#
-#    ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
+    ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
     ret.standstill = False
 
     # irrelevant for non-car
