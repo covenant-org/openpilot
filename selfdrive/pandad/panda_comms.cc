@@ -685,7 +685,7 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
       if (this->mavsdk_telemetry_messages.position.relative_altitude_m >=
           this->min_height) {
         mavsdk::Offboard::VelocityBodyYawspeed stay{};
-        this->mavsdk_telemetry_plugin->set_velocity_body(stay);
+        this->mavsdk_offboard_plugin->set_velocity_body(stay);
         this->mavsdk_offboard_plugin->start();
       }
       mavsdk::Offboard::VelocityBodyYawspeed stay{};
@@ -697,7 +697,7 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
           this->min_height) {
         stay.down_m_s = -0.5;
       }
-      this->mavsdk_telemetry_plugin->set_velocity_body(stay);
+      this->mavsdk_offboard_plugin->set_velocity_body(stay);
       printf("angle %d, speed %d\n", angle, speed);
     }
     if (frame.address != 0x7DF && frame.address != this->ecu_add) {
