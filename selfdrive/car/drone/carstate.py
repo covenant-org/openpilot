@@ -8,7 +8,6 @@ STARTUP_TICKS = 100
 class CarState(CarStateBase):
   def update(self, cp):
     ret = car.CarState.new_message()
-    print(cp.vl['DRONE_DATA'])
 
     ret.vEgoRaw = cp.vl['DRONE_DATA']['SPEED']
     ret.cruiseState.speed = cp.vl['DRONE_DATA']['SPEED']

@@ -683,7 +683,8 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
       uint16_t angle = frame.dat[1] << 8 | frame.dat[2];
       uint16_t speed = frame.dat[3] << 8 | frame.dat[4];
       if (this->mavsdk_telemetry_messages.position.relative_altitude_m >=
-          this->min_height) {
+              this->min_height &&
+          !this->mavsdk_offboard_plugin->is_active()) {
         mavsdk::Offboard::VelocityBodyYawspeed stay{};
         this->mavsdk_offboard_plugin->set_velocity_body(stay);
         this->mavsdk_offboard_plugin->start();
@@ -704,10 +705,6 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
       continue;
     }
     std::string frame_dat = frame.dat;
-    for (const uint8_t &byte : frame_dat) {
-      printf("%02x ", byte);
-    }
-    printf("\n");
     char len = frame_dat[0] & 0x0F;
     if (frame_dat[1] == CANServiceTypes::READ_DATA_BY_IDENTIFIER) {
       uint32_t identifier = 0;
@@ -768,7 +765,6 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
 
 int PandaMavlinkHandle::bulk_read(unsigned char endpoint, unsigned char *data,
                                   int length, unsigned int timeout) {
-  printf("Read request: %02x\n", endpoint);
   int total_read = 0;
   std::unique_lock<std::mutex> lk(this->msg_lock);
   this->msg_cv.wait_for(lk, std::chrono::milliseconds(100),
@@ -800,10 +796,5 @@ int PandaMavlinkHandle::bulk_read(unsigned char endpoint, unsigned char *data,
     };
     total_read += pack_can_msg(0, 0x266, content, data + total_read);
   }
-  printf("Response: ");
-  for (int i = 0; i < total_read; i++) {
-    printf("%02x ", data[i]);
-  }
-  printf("\n");
   return total_read;
 }
