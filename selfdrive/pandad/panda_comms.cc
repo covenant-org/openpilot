@@ -324,7 +324,8 @@ bool PandaMavlinkHandle::connect_autopilot() {
     if (armed &&
         this->mavsdk_telemetry_messages.position.relative_altitude_m <= 1.0) {
       this->mavsdk_action_plugin->set_takeoff_altitude(this->min_height + 1);
-      this->mavsdk_action_plugin->takeoff();
+      this->mavsdk_action_plugin->takeoff_async(
+          [](mavsdk::Action::Result success) { (void)success; });
     }
   });
   return true;
@@ -689,7 +690,7 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
         this->mavsdk_offboard_plugin->set_velocity_body(stay);
         mavsdk::Offboard::Result result = this->mavsdk_offboard_plugin->start();
         if (result != mavsdk::Offboard::Result::Success) {
-            LOGE("failed to start offboard");
+          LOGE("failed to start offboard");
         }
       }
       mavsdk::Offboard::VelocityBodyYawspeed stay{};
