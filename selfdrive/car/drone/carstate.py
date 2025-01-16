@@ -14,6 +14,7 @@ class CarState(CarStateBase):
 #
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
     ret.standstill = False
+    ret.steerFaultPermanent = False
 
     # irrelevant for non-car
     ret.gearShifter = car.CarState.GearShifter.drive
