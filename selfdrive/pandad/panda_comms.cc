@@ -319,8 +319,14 @@ bool PandaMavlinkHandle::connect_autopilot() {
       [&](mavsdk::Telemetry::Position position) {
         this->mavsdk_telemetry_messages.position = position;
       });
-  this->mavsdk_telemetry_plugin->subscribe_armed(
-      [&](bool armed) { this->ignited = armed; });
+  this->mavsdk_telemetry_plugin->subscribe_armed([&](bool armed) {
+    this->ignited = armed;
+    if (armed &&
+        this->mavsdk_telemetry_messages.position.relative_altitude_m <= 1.0) {
+      this->mavsdk_action_plugin->set_takeoff_altitude(this->min_height);
+      this->mavsdk_action_plugin->takeoff();
+    }
+  });
   return true;
 }
 
@@ -673,8 +679,26 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
   unpack_can_buffer(data, size, output);
   for (const can_frame &frame : output) {
     printf("Address %02lx: ", frame.address);
-    if (frame.address == 0x265){
-      printf("0x265\n");
+    if (frame.address == 0x265) {
+      uint16_t angle = frame.dat[1] << 8 | frame.dat[2];
+      uint16_t speed = frame.dat[3] << 8 | frame.dat[4];
+      if (this->mavsdk_telemetry_messages.position.relative_altitude_m >=
+          this->min_height) {
+        mavsdk::Offboard::VelocityBodyYawspeed stay{};
+        this->mavsdk_telemetry_plugin->set_velocity_body(stay);
+        this->mavsdk_offboard_plugin->start();
+      }
+      mavsdk::Offboard::VelocityBodyYawspeed stay{};
+      if (this->mavsdk_telemetry_messages.position.relative_altitude_m >
+          this->min_height) {
+        stay.down_m_s = 0.5;
+      }
+      if (this->mavsdk_telemetry_messages.position.relative_altitude_m <
+          this->min_height) {
+        stay.down_m_s = -0.5;
+      }
+      this->mavsdk_telemetry_plugin->set_velocity_body(stay);
+      printf("angle %d, speed %d\n", angle, speed);
     }
     if (frame.address != 0x7DF && frame.address != this->ecu_add) {
       continue;
