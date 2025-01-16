@@ -687,7 +687,10 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
           !this->mavsdk_offboard_plugin->is_active()) {
         mavsdk::Offboard::VelocityBodyYawspeed stay{};
         this->mavsdk_offboard_plugin->set_velocity_body(stay);
-        this->mavsdk_offboard_plugin->start();
+        mavsdk::Offboard::Result result = this->mavsdk_offboard_plugin->start();
+        if (result != mavsdk::Offboard::Result::Success) {
+            LOGE("failed to start offboard");
+        }
       }
       mavsdk::Offboard::VelocityBodyYawspeed stay{};
       if (this->mavsdk_telemetry_messages.position.relative_altitude_m >
