@@ -287,7 +287,6 @@ bool PandaMavlinkHandle::connect_autopilot() {
       this->hw_serial.rfind("serial", 0) != 0) {
     return false;
   }
-  printf("MAVSDK connectin to %s", this->hw_serial.c_str());
   this->mavsdk_connection_result =
       this->mavsdk.add_any_connection(this->hw_serial);
   if (this->mavsdk_connection_result != mavsdk::ConnectionResult::Success) {
@@ -674,6 +673,9 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
   unpack_can_buffer(data, size, output);
   for (const can_frame &frame : output) {
     printf("Address %02lx: ", frame.address);
+    if (frame.address == 0x265){
+      printf("0x265\n");
+    }
     if (frame.address != 0x7DF && frame.address != this->ecu_add) {
       continue;
     }
@@ -766,7 +768,6 @@ int PandaMavlinkHandle::bulk_read(unsigned char endpoint, unsigned char *data,
                          .angular_velocity_body.yaw_rad_s;
     yaw_rate *= 180 / M_PI;
     uint16_t yaw_rate_deg = static_cast<uint16_t>(yaw_rate * 10);
-    printf("Speed: %d m/s, Yaw rate: %d deg/s\n", speed_mps, yaw_rate_deg);
     std::string content = {
         (char)((yaw_rate_deg & 0xFF00) >> 8),
         (char)(yaw_rate_deg & 0xFF),
