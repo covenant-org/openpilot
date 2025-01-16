@@ -155,6 +155,7 @@ private:
   uint16_t canfd[4] = {0, 0, 0, 0};
   uint32_t uptime = 0;
   bool ignited = 0;
+  float min_height = 1.5;
   std::string vin = "JH4DB1542MS007683";
   std::string fw_version = "ncl.0.01";
   std::queue<std::tuple<uint8_t, uint32_t, std::string>> msg_queue;
