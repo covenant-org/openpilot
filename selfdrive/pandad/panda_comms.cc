@@ -9,6 +9,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <mavsdk/mavsdk.h>
 #include <mavsdk/plugins/telemetry/telemetry.h>
@@ -283,12 +284,13 @@ bool PandaMavlinkHandle::connect_autopilot() {
   if (this->mavsdk_system.has_value()) {
     return true;
   }
-  if (this->hw_serial.rfind("udp", 0) != 0 &&
-      this->hw_serial.rfind("serial", 0) != 0) {
-    return false;
+  char *uri = std::getenv("MAVLINK_CONNECTION_URI");
+  if (uri != nullptr) {
+    this->mavlink_uri = uri;
   }
+
   this->mavsdk_connection_result =
-      this->mavsdk.add_any_connection(this->hw_serial);
+      this->mavsdk.add_any_connection(this->mavlink_uri);
   if (this->mavsdk_connection_result != mavsdk::ConnectionResult::Success) {
     LOGE("MAVSDK: connection failed");
     return false;
@@ -344,14 +346,7 @@ PandaMavlinkHandle::PandaMavlinkHandle(std::string serial)
 PandaMavlinkHandle::~PandaMavlinkHandle() { this->connected = false; }
 
 std::vector<std::string> PandaMavlinkHandle::list() {
-  std::vector<std::string> serials;
-  std::string uri = "serial:///dev/ttyUSB0:57600";
-  char *env_uri = std::getenv("MAVLINK_CONNECTION_URI");
-  if (env_uri != nullptr) {
-    uri = std::string(env_uri);
-  }
-  serials.push_back(uri);
-  return serials;
+  return PandaUsbHandle::list();
 }
 
 int PandaMavlinkHandle::control_write(uint8_t bRequest, uint16_t wValue,
