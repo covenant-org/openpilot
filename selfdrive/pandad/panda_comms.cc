@@ -20,6 +20,7 @@
 #include <tuple>
 #include <unistd.h>
 
+#include "panda/board/health.h"
 #include "common/swaglog.h"
 
 static libusb_context *init_usb_ctx() {
@@ -415,115 +416,34 @@ int PandaMavlinkHandle::control_read(uint8_t bRequest, uint16_t wValue,
   case PandaEndpoints::GET_STATE: {
     // uptime
     this->uptime += 100;
-    data[0] = (this->uptime & 0xFF000000) >> 24;
-    data[1] = (this->uptime & 0xFF0000) >> 16;
-    data[2] = (this->uptime & 0xFF00) >> 8;
-    data[3] = this->uptime & 0xFF;
-
-    // voltage
-    data[4] = 0;
-    data[5] = 0;
-    data[6] = 0;
-    data[7] = 12;
-
-    // current
-    data[8] = 0;
-    data[9] = 0;
-    data[10] = 0;
-    data[11] = 0;
-
-    // tx_blocked
-    data[12] = 0;
-    data[13] = 0;
-    data[14] = 0;
-    data[15] = 0;
-
-    // rx_invalid
-    data[16] = 0;
-    data[17] = 0;
-    data[18] = 0;
-    data[19] = 0;
-
-    // tx_overflows
-    data[20] = 0;
-    data[21] = 0;
-    data[22] = 0;
-    data[23] = 0;
-
-    // rx_overflows
-    data[24] = 0;
-    data[25] = 0;
-    data[26] = 0;
-    data[27] = 0;
-
-    // faults
-    data[28] = 0;
-    data[29] = 0;
-    data[30] = 0;
-    data[31] = 0;
-
-    // ignition line
-    data[32] = this->ignited;
-
-    // ignition can
-    data[33] = this->ignited;
-
-    // controls allowed
-    data[34] = 1;
-
-    // car harness status
-    data[35] = 1; // normal
-
-    // safety mode
-    data[36] = this->safety_model;
-
-    // safety param
-    data[37] = 0;
-    data[38] = 0;
-
-    // fault status
-    data[39] = 0;
-
-    // power save enabled
-    data[40] = this->power_saving;
-
-    // heartbeat lost
-    data[41] = 0;
-
-    // alternative experience
-    data[42] = (this->alternative_experience & 0xFF00) >> 8;
-    data[43] = this->alternative_experience & 0xFF;
-
-    // interrupt load
-    data[44] = 0;
-    data[45] = 0;
-    data[46] = 0;
-    data[47] = 0;
-
-    // fan power
-    data[48] = 0;
-
-    // safety rx checks invalid
-    data[49] = 0;
-
-    // spi checksum error count
-    data[50] = 0;
-    data[51] = 0;
-
-    // fan stall count
-    data[52] = 0;
-
-    // sub1 voltage mv
-    uint16_t volt = 12000;
-    data[53] = (volt & 0xFF00) >> 8;
-    data[54] = volt & 0xFF;
-
-    // sub2 voltage mv
-    data[55] = (volt & 0xFF00) >> 8;
-    data[56] = volt & 0xFF;
-
-    // som reset tirggered
-    data[57] = 0;
+    health_t info;
+    info.uptime_pkt = this->uptime;
+    info.voltage_pkt = 12;
+    info.current_pkt = 1 * 1000;
+    info.safety_tx_blocked_pkt = 0;
+    info.safety_rx_invalid_pkt = 0;
+    info.tx_buffer_overflow_pkt = 0;
+    info.rx_buffer_overflow_pkt = 0;
+    info.faults_pkt = 0;
+    info.ignition_line_pkt = this->ignited;
+    info.ignition_can_pkt = this->ignited;
+    info.controls_allowed_pkt = 1;
+    info.car_harness_status_pkt = 1;
+    info.safety_mode_pkt = this->safety_model;
+    info.safety_param_pkt = 0;
+    info.fault_status_pkt = 0;
+    info.power_save_enabled_pkt = this->power_saving;
+    info.heartbeat_lost_pkt = 0;
+    info.alternative_experience_pkt = this->alternative_experience;
+    info.interrupt_load_pkt = 0;
+    info.fan_power = 0;
+    info.safety_rx_checks_invalid_pkt = 0;
+    info.spi_checksum_error_count_pkt = 0;
+    info.fan_stall_count = 0;
+    info.sbu1_voltage_mV = 12000;
+    info.sub2_voltage_mV = 12000;
+    info.som_reset_triggered = 0;
+    memcpy(data, (char *)&info, sizeof(health_t));
     break;
   }
   case PandaEndpoints::GET_CAN_STATE: {
