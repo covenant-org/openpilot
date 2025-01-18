@@ -477,56 +477,53 @@ int PandaMavlinkHandle::control_read(uint8_t bRequest, uint16_t wValue,
     // safety mode
     data[36] = this->safety_model;
 
-    // fault_status
-    data[37] = 0;
-
     // safety param
+    data[37] = 0;
     data[38] = 0;
-    data[39] = 0;
 
     // fault status
-    data[40] = 0;
+    data[39] = 0;
 
     // power save enabled
-    data[41] = this->power_saving;
+    data[40] = this->power_saving;
 
     // heartbeat lost
-    data[42] = 0;
+    data[41] = 0;
 
     // alternative experience
-    data[43] = (this->alternative_experience & 0xFF00) >> 8;
-    data[44] = this->alternative_experience & 0xFF;
+    data[42] = (this->alternative_experience & 0xFF00) >> 8;
+    data[43] = this->alternative_experience & 0xFF;
 
     // interrupt load
+    data[44] = 0;
     data[45] = 0;
     data[46] = 0;
     data[47] = 0;
-    data[48] = 0;
 
     // fan power
-    data[49] = 0;
+    data[48] = 0;
 
     // safety rx checks invalid
-    data[50] = 0;
+    data[49] = 0;
 
     // spi checksum error count
+    data[50] = 0;
     data[51] = 0;
-    data[52] = 0;
 
     // fan stall count
-    data[53] = 0;
+    data[52] = 0;
 
     // sub1 voltage mv
     uint16_t volt = 12000;
-    data[54] = (volt & 0xFF00) >> 8;
-    data[55] = volt & 0xFF;
+    data[53] = (volt & 0xFF00) >> 8;
+    data[54] = volt & 0xFF;
 
     // sub2 voltage mv
-    data[56] = (volt & 0xFF00) >> 8;
-    data[57] = volt & 0xFF;
+    data[55] = (volt & 0xFF00) >> 8;
+    data[56] = volt & 0xFF;
 
     // som reset tirggered
-    data[58] = 0;
+    data[57] = 0;
     break;
   }
   case PandaEndpoints::GET_CAN_STATE: {
