@@ -447,97 +447,34 @@ int PandaMavlinkHandle::control_read(uint8_t bRequest, uint16_t wValue,
     break;
   }
   case PandaEndpoints::GET_CAN_STATE: {
-    // TODO: this is really dum way to do this, we should use the appropiate
-    // struct bus off
-    data[0] = 10;
-    // bus off count
-    data[1] = 0;
-    data[2] = 0;
-    data[3] = 0;
-    data[4] = 0;
-    // error warning
-    data[2] = 0;
-    // error passive
-    data[3] = 0;
-    // last error
-    data[4] = 0;
-    // last stored error
-    data[5] = 0;
-    // last data error
-    data[6] = 0;
-    // last data stored error
-    data[7] = 0;
-    // receive error cnt
-    data[8] = 0;
-    // transmit error cnt
-    data[9] = 0;
-    // total error cnt
-    data[10] = 0;
-    data[11] = 0;
-    data[12] = 0;
-    data[13] = 0;
-    // total tx lost cnt
-    data[14] = 0;
-    data[15] = 0;
-    data[16] = 0;
-    data[17] = 0;
-    // total rx lost cnt
-    data[18] = 0;
-    data[19] = 0;
-    data[20] = 0;
-    data[21] = 0;
-    // total tx cnt
-    data[22] = 0;
-    data[23] = 0;
-    data[24] = 0;
-    data[25] = 0;
-    // total rx cnt
-    data[26] = 0;
-    data[27] = 0;
-    data[28] = 0;
-    data[29] = 0;
-    // total fwd cnt
-    data[30] = 0;
-    data[31] = 0;
-    data[32] = 0;
-    data[33] = 0;
-    // total tx checksum error cnt
-    data[34] = 0;
-    data[35] = 0;
-    data[36] = 0;
-    data[37] = 0;
-    // can speed
-    data[38] = 0x03;
-    data[39] = 0xE8;
-    // can data speed
-    data[40] = 0x03;
-    data[41] = 0xE8;
-    // canfd enabled
-    data[42] = 1;
-    // brs enabled
-    data[43] = 0;
-    // canfd non iso
-    data[44] = 0;
-    // irq0 call rate
-    data[45] = 0;
-    data[46] = 0;
-    data[47] = 0x0F;
-    data[48] = 0x42;
-    // irq1 call rate
-    data[49] = 0;
-    data[50] = 0x0F;
-    data[51] = 0x42;
-    data[52] = 0x40;
-    // irq2 call rate
-    data[53] = 0;
-    data[54] = 0x0F;
-    data[55] = 0x42;
-    data[56] = 0x40;
-    // can core reset cnt
-    data[57] = 0;
-    data[58] = 0x0F;
-    data[59] = 0x42;
-    data[60] = 0x40;
+    can_health_t info;
+    info.bus_off = 10;
+    info.bus_off_cnt = 0;
+    info.error_warning = 0;
+    info.error_passive = 0;
+    info.last_error = 0;
+    info.last_stored_error = 0;
+    info.last_data_error = 0;
+    info.last_data_stored_error = 0;
+    info.receive_error_cnt = 0;
+    info.transmit_error_cnt = 0;
+    info.total_error_cnt = 0;
+    info.total_tx_lost_cnt = 0;
+    info.total_rx_lost_cnt = 0;
+    info.total_tx_cnt = 0;
+    info.total_rx_cnt = 0;
+    info.total_fwd_cnt = 0;
+    info.total_tx_checksum_error_cnt = 0;
+    info.can_speed = 1000;
+    info.can_data_speed = 1000;
+    info.canfd_enabled = 1;
+    info.brs_enabled = 0;
+    info.canfd_non_iso = 0;
+    info.irq0_call_rate = 1000000;
+    info.irq1_call_rate = 1000000;
+    info.irq2_call_rate = 1000000;
+    info.can_core_reset_cnt = 0;
+    memcpy(data, (char *)&info, sizeof(can_health_t));
     break;
   }
   }
