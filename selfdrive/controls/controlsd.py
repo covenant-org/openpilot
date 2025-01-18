@@ -304,7 +304,8 @@ class Controls:
         elif not self.sm.all_freq_ok(self.camera_packets):
           self.events.add(EventName.cameraFrameRate)
     if not REPLAY and self.rk.lagging:
-      self.events.add(EventName.controlsdLagging)
+      pass
+      #self.events.add(EventName.controlsdLagging)
     if len(self.sm['radarState'].radarErrors) or ((not self.rk.lagging or REPLAY) and not self.sm.all_checks(['radarState'])):
       self.events.add(EventName.radarFault)
     if not self.sm.valid['pandaStates']:
@@ -499,8 +500,12 @@ class Controls:
 
     # DISABLED
     elif self.state == State.disabled:
+      print( "DISABLED" )
       if self.events.contains(ET.ENABLE):
+        print( "Events contains ENABLE" )
         if self.events.contains(ET.NO_ENTRY):
+          print( "Events contains NO_ENTRY" )
+          print( f"{json.dumps(self.events, indent=2)}" )
           self.current_alert_types.append(ET.NO_ENTRY)
 
         else:
