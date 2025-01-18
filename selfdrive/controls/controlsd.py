@@ -503,20 +503,21 @@ class Controls:
       print( "DISABLED" )
       if self.events.contains(ET.ENABLE):
         print( "Events contains ENABLE" )
+        '''
+        # We are ignoring all problems here
         if self.events.contains(ET.NO_ENTRY):
           print( "Events contains NO_ENTRY" )
-          print( f"{json.dumps(self.events, indent=2)}" )
           self.current_alert_types.append(ET.NO_ENTRY)
-
         else:
-          if self.events.contains(ET.PRE_ENABLE):
-            self.state = State.preEnabled
-          elif self.events.contains(ET.OVERRIDE_LATERAL) or self.events.contains(ET.OVERRIDE_LONGITUDINAL):
-            self.state = State.overriding
-          else:
-            self.state = State.enabled
-          self.current_alert_types.append(ET.ENABLE)
-          self.v_cruise_helper.initialize_v_cruise(CS, self.experimental_mode)
+       '''
+        if self.events.contains(ET.PRE_ENABLE):
+          self.state = State.preEnabled
+        elif self.events.contains(ET.OVERRIDE_LATERAL) or self.events.contains(ET.OVERRIDE_LONGITUDINAL):
+          self.state = State.overriding
+        else:
+          self.state = State.enabled
+        self.current_alert_types.append(ET.ENABLE)
+        self.v_cruise_helper.initialize_v_cruise(CS, self.experimental_mode)
 
     # Check if openpilot is engaged and actuators are enabled
     self.enabled = self.state in ENABLED_STATES
