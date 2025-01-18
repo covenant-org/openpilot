@@ -141,8 +141,8 @@ public:
   static std::vector<std::string> list();
 
 private:
-  uint16_t safety_model = 0;
-  uint16_t alternative_experience = 0;
+  uint16_t safety_model = 32;
+  uint16_t alternative_experience = 1;
   uint16_t fan_speed = 0;
   uint16_t ir_pwr = 0;
   uint16_t loopback = 0;
