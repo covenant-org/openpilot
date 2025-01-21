@@ -13,7 +13,7 @@ class CarController(CarControllerBase):
   def __init__(self, dbc_name, CP, VM):
     self.frame = 0
     self.packer = CANPacker(dbc_name)
-    self.altitude_pid = PIDController(0.5, k_i=0.1, rate=1/DT_CTRL)
+    self.altitude_pid = PIDController(0.75, k_i=0.4, rate=1/DT_CTRL)
 
   def update(self, CC, CS, now_nanos):
     # [0.0, 1.0]
