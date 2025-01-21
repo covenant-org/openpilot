@@ -20,7 +20,6 @@
 #include <tuple>
 #include <unistd.h>
 
-#include "panda/board/health.h"
 #include "common/swaglog.h"
 
 static libusb_context *init_usb_ctx() {
@@ -441,7 +440,7 @@ int PandaMavlinkHandle::control_read(uint8_t bRequest, uint16_t wValue,
     info.spi_checksum_error_count_pkt = 0;
     info.fan_stall_count = 0;
     info.sbu1_voltage_mV = 12000;
-    info.sub2_voltage_mV = 12000;
+    info.sbu2_voltage_mV = 12000;
     info.som_reset_triggered = 0;
     memcpy(data, (char *)&info, sizeof(health_t));
     break;
