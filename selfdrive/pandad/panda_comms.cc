@@ -623,8 +623,12 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
   for (const can_frame &frame : output) {
     printf("Address %02lx: ", frame.address);
     if (frame.address == 0x265) {
-      uint16_t angle = frame.dat[1] << 8 | frame.dat[2];
-      uint16_t speed = frame.dat[3] << 8 | frame.dat[4];
+      for (int i = 0; i < frame.dat.size(); i++) {
+        printf("%02x ", frame.dat[i]);
+      }
+      printf("\n");
+      int16_t angle = frame.dat[0] << 8 | frame.dat[1];
+      int16_t speed = frame.dat[2] << 8 | frame.dat[3];
       if (this->mavsdk_telemetry_messages.position.relative_altitude_m >=
               this->min_height &&
           !this->mavsdk_offboard_plugin->is_active()) {
