@@ -16,8 +16,10 @@ class CarController(CarControllerBase):
     # [0.0, 1.0]
     accel = CC.actuators.accel
     desired_speed = (CS.out.vEgo * 0.97) + accel
-    if desired_speed > 3:
-      desired_speed = 3
+    if desired_speed > 10:
+      desired_speed = 10
+    if desired_speed < 0:
+      desired_speed = 0
 
     w = 4.5
     steering_angle = math.radians(CC.actuators.steeringAngleDeg)
