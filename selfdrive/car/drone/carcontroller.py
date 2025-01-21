@@ -13,9 +13,7 @@ class CarController(CarControllerBase):
 
   def update(self, CC, CS, now_nanos):
     # [0.0, 1.0]
-    gas = CC.actuators.gas
-    brk = CC.actuators.brake
-    accel = (gas - brk) * 0.5
+    accel = CC.actuators.accel
     desired_speed = (CC.actuators.speed * 0.97) + accel
     if desired_speed > 3:
       desired_speed = 3

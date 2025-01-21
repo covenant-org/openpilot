@@ -635,17 +635,18 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
           LOGE("failed to start offboard");
         }
       }
-      mavsdk::Offboard::VelocityBodyYawspeed stay{};
+      printf("angle %d, speed %d\n", angle, speed);
+      mavsdk::Offboard::VelocityBodyYawspeed command{};
       if (this->mavsdk_telemetry_messages.position.relative_altitude_m >
           this->min_height) {
-        stay.down_m_s = 0.5;
+        command.down_m_s = 0.5;
       }
       if (this->mavsdk_telemetry_messages.position.relative_altitude_m <
           this->min_height) {
-        stay.down_m_s = -0.5;
+        command.down_m_s = -0.5;
       }
-      this->mavsdk_offboard_plugin->set_velocity_body(stay);
-      printf("angle %d, speed %d\n", angle, speed);
+      command.forward_m_s = speed / 100.0;
+      this->mavsdk_offboard_plugin->set_velocity_body(command);
     }
     if (frame.address != 0x7DF && frame.address != this->ecu_add) {
       continue;
