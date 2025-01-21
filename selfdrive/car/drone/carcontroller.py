@@ -29,7 +29,7 @@ class CarController(CarControllerBase):
     can_sends = []
     print(CC.actuators)
     print(f"{int(turn_degrees * 10)} {int(desired_speed * 100)}")
-    can_sends.append(bodycan.create_control(self.packer, int(turn_degrees * 10), int(desired_speed * 100)))
+    can_sends.append(bodycan.create_control(self.packer, turn_degrees, desired_speed))
 
     new_actuators = CC.actuators.as_builder()
     new_actuators.steerOutputCan = turn_degrees
