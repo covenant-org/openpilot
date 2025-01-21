@@ -323,7 +323,7 @@ bool PandaMavlinkHandle::connect_autopilot() {
       });
   this->mavsdk_telemetry_plugin->subscribe_armed([&](bool armed) {
     this->ignited = armed;
-    if (!armed){
+    if (!armed) {
       this->should_start_offboard = true;
     }
     if (this->should_start_offboard && armed &&
@@ -632,7 +632,8 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
       printf("\n");
       int16_t angle = frame.dat[0] << 8 | frame.dat[1];
       int16_t speed = frame.dat[2] << 8 | frame.dat[3];
-      printf("angle %d, speed %d\n", angle, speed);
+      int16_t down = frame.dat[4] << 8 | frame.dat[5];
+      printf("angle %d, speed %d, down %d\n", angle, speed, down);
       if (this->mavsdk_telemetry_messages.position.relative_altitude_m >=
               this->min_height &&
           !this->mavsdk_offboard_plugin->is_active()) {
@@ -645,16 +646,11 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
           this->should_start_offboard = false;
         }
       }
-      if (!this->mavsdk_offboard_plugin->is_active()) continue;
+      if (!this->mavsdk_offboard_plugin->is_active())
+        continue;
       mavsdk::Offboard::VelocityBodyYawspeed command{};
-      if (this->mavsdk_telemetry_messages.position.relative_altitude_m >
-          this->min_height) {
-        command.down_m_s = 0.5;
-      }
-      if (this->mavsdk_telemetry_messages.position.relative_altitude_m <
-          this->min_height) {
-        command.down_m_s = -0.5;
-      }
+      command.down_m_s = down / 100.0;
+      command.yawspeed_deg_s = angle / 10.0;
       command.forward_m_s = speed / 100.0;
       this->mavsdk_offboard_plugin->set_velocity_body(command);
     }
@@ -744,12 +740,14 @@ int PandaMavlinkHandle::bulk_read(unsigned char endpoint, unsigned char *data,
     float yaw_rate = this->mavsdk_telemetry_messages.odometry
                          .angular_velocity_body.yaw_rad_s;
     yaw_rate *= 180 / M_PI;
-    uint16_t yaw_rate_deg = static_cast<uint16_t>(yaw_rate * 10);
+    int16_t yaw_rate_deg = static_cast<int16_t>(yaw_rate * 10);
+    float altitude =
+        this->mavsdk_telemetry_messages.position.relative_altitude_m;
+    int16_t altitude_m = static_cast<int16_t>(altitude * 100);
     std::string content = {
-        (char)((yaw_rate_deg & 0xFF00) >> 8),
-        (char)(yaw_rate_deg & 0xFF),
-        (char)((speed_mps & 0xFF00) >> 8),
-        (char)(speed_mps & 0xFF),
+        (char)((yaw_rate_deg & 0xFF00) >> 8), (char)(yaw_rate_deg & 0xFF),
+        (char)((speed_mps & 0xFF00) >> 8),    (char)(speed_mps & 0xFF),
+        (char)((altitude_m & 0xFF00) >> 8),   (char)(altitude_m & 0xFF),
     };
     total_read += pack_can_msg(0, 0x266, content, data + total_read);
   }
