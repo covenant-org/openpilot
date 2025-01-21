@@ -1,16 +1,19 @@
 import math
 
+from openpilot.common.realtime import DT_CTRL
 from opendbc.can.packer import CANPacker
 from openpilot.selfdrive.car.drone import bodycan
 from openpilot.selfdrive.car.interfaces import CarControllerBase
 from openpilot.selfdrive.controls.lib.pid import PIDController
 
 MAX_ANGLE=math.radians(45)
+DESIRED_ALTITUDE=2.5
 
 class CarController(CarControllerBase):
   def __init__(self, dbc_name, CP, VM):
     self.frame = 0
     self.packer = CANPacker(dbc_name)
+    self.altitude_pid = PIDController(0.5, k_i=0.1, rate=1/DT_CTRL)
 
   def update(self, CC, CS, now_nanos):
     # [0.0, 1.0]
@@ -32,8 +35,11 @@ class CarController(CarControllerBase):
 
     can_sends = []
     print(CC.actuators)
-    print(f"{int(turn_degrees * 10)} {int(desired_speed * 100)}")
-    can_sends.append(bodycan.create_control(self.packer, turn_degrees, desired_speed))
+    # TODO:proper altitude param in car state
+    altitude = CS.out.wheelSpeeds.rl
+    altitude_error = DESIRED_ALTITUDE - altitude
+    down_ms = self.altitude_pid.update(altitude_error, freeze_integrator=False)
+    can_sends.append(bodycan.create_control(self.packer, turn_degrees, desired_speed, down_ms))
 
     new_actuators = CC.actuators.as_builder()
     new_actuators.steerOutputCan = turn_degrees
