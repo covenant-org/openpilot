@@ -629,7 +629,8 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
       printf("\n");
       int16_t angle = frame.dat[0] << 8 | frame.dat[1];
       int16_t speed = frame.dat[2] << 8 | frame.dat[3];
-      if (this->mavsdk_telemetry_messages.position.relative_altitude_m >=
+      if (this->should_start_offboard &&
+          this->mavsdk_telemetry_messages.position.relative_altitude_m >=
               this->min_height &&
           !this->mavsdk_offboard_plugin->is_active()) {
         mavsdk::Offboard::VelocityBodyYawspeed stay{};
@@ -637,6 +638,8 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
         mavsdk::Offboard::Result result = this->mavsdk_offboard_plugin->start();
         if (result != mavsdk::Offboard::Result::Success) {
           LOGE("failed to start offboard");
+        } else {
+          this->should_start_offboard = false;
         }
       }
       printf("angle %d, speed %d\n", angle, speed);

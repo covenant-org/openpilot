@@ -170,6 +170,7 @@ private:
   std::shared_ptr<mavsdk::Offboard> mavsdk_offboard_plugin;
   std::shared_ptr<mavsdk::Telemetry> mavsdk_telemetry_plugin;
   TelemetryMessages mavsdk_telemetry_messages;
+  bool should_start_offboard = true;
 
   bool connect_autopilot();
 };
