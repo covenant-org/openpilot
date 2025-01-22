@@ -49,7 +49,8 @@ void HomeWindow::showSidebar(bool show) {
 }
 
 void HomeWindow::updateState(const UIState &s) {
-  const SubMaster &sm = *(s.sm);
+    (void)s;
+//  const SubMaster &sm = *(s.sm);
 
   // switch to the generic robot UI
   /*
