@@ -21,6 +21,8 @@ class CarInterface(CarInterfaceBase):
     ret.radarUnavailable = True
     ret.openpilotLongitudinalControl = True
     ret.steerControlType = car.CarParams.SteerControlType.angle
+    ret.vEgoStarting = 0.1
+    ret.vEgoStopping = 0.1
 
     return ret
 
