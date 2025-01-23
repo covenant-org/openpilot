@@ -2,13 +2,17 @@ import numpy as np
 import os
 import pyopencl as cl
 import pyopencl.array as cl_array
+import socket
 
 from msgq.visionipc import VisionIpcServer, VisionStreamType
 from cereal import messaging, log
-from openpilot.common.realtime import RateKeeper
+from openpilot.common.realtime import Ratekeeper
+from threading import Thread
+from time import sleep
 
 from openpilot.common.basedir import BASEDIR
-from openpilot.tools.sim.lib.common import W, H
+W, H = 1928, 1208
+MAX_BUFFER_SIZE=10*1024*1024
 
 class GZCamerad:
   """Simulates the camerad daemon"""
@@ -17,11 +21,12 @@ class GZCamerad:
 
     self.frame_road_id = 0
     self.frame_wide_id = 0
+    self.last_frame=None
     self.vipc_server = VisionIpcServer("camerad")
 
-    self.vipc_server.create_buffers(VisionStreamType.VISION_STREAM_ROAD, 5, W, H)
+    self.vipc_server.create_buffers(VisionStreamType.VISION_STREAM_ROAD, 5, False, W, H)
     if dual_camera:
-      self.vipc_server.create_buffers(VisionStreamType.VISION_STREAM_WIDE_ROAD, 5, W, H)
+      self.vipc_server.create_buffers(VisionStreamType.VISION_STREAM_WIDE_ROAD, 5, False, W, H)
 
     self.vipc_server.start_listener()
 
@@ -30,7 +35,7 @@ class GZCamerad:
     self.queue = cl.CommandQueue(self.ctx)
     cl_arg = f" -DHEIGHT={H} -DWIDTH={W} -DRGB_STRIDE={W * 3} -DUV_WIDTH={W // 2} -DUV_HEIGHT={H // 2} -DRGB_SIZE={W * H} -DCL_DEBUG "
 
-    kernel_fn = os.path.join(BASEDIR, "tools/sim/rgb_to_nv12.cl")
+    kernel_fn = os.path.join(BASEDIR, "tools/rgb_to_nv12.cl")
     with open(kernel_fn) as f:
       prg = cl.Program(self.ctx, f.read()).build(cl_arg)
       self.krnl = prg.rgb_to_nv12
@@ -65,7 +70,8 @@ class GZCamerad:
       "frameId": frame_id,
       "transform": [1.0, 0.0, 0.0,
                     0.0, 1.0, 0.0,
-                    0.0, 0.0, 1.0]
+                    0.0, 0.0, 1.0],
+      "sensor": 2
     }
     setattr(dat, pub_type, msg)
     self.pm.send(pub_type, dat)
@@ -74,6 +80,7 @@ class GZCamerad:
     data = bytearray(MAX_BUFFER_SIZE)
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect(("192.168.100.100", 4069))
+        print("Connected to remote")
         s.send(bytes([0]))
         offset = 0
         while offset < len(data):
@@ -82,21 +89,31 @@ class GZCamerad:
             offset += len(recv)
             if len(recv) == 0:
                 break
+        print("Received frame")
 
     thumbnail = log.Thumbnail.from_bytes_packed(data)
     original = np.frombuffer(thumbnail.thumbnail, dtype=np.uint8).reshape((1080, 1920, 3))
-    return np.pad(original, [(0, H - 1080), (0, W - 1920), (0, 0)], mode='constant', constant_values=0)
+    frame = np.pad(original, [(0, H - 1080), (0, W - 1920), (0, 0)], mode='constant', constant_values=0)
+    self.last_frame = self.rgb_to_yuv(frame)
+    return frame
+
+  def get_frame_thread(self):
+    while True:
+      self.get_frame()
 
   def run(self):
-      rk = RateKeeper(10)
+      rk = Ratekeeper(100)
       while True:
-        frame = self.get_frame()
-        yuv = self.rgb_to_yuv(frame)
-        self.cam_send_yuv_road(yuv)
+        if self.last_frame is None:
+          sleep(3)
+          continue
+        self.cam_send_yuv_road(self.last_frame)
         rk.monitor_time()
 
 def main():
     camerad = GZCamerad(dual_camera=False)
+    thread = Thread(target=camerad.get_frame_thread)
+    thread.start()
     camerad.run()
 
 if __name__ == "__main__":
