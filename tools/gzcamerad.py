@@ -102,7 +102,7 @@ class GZCamerad:
       self.get_frame()
 
   def run(self):
-      rk = Ratekeeper(100)
+      rk = Ratekeeper(1000)
       while True:
         if self.last_frame is None:
           sleep(3)

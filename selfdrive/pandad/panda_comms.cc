@@ -328,7 +328,7 @@ bool PandaMavlinkHandle::connect_autopilot() {
     }
     if (this->should_start_offboard && armed &&
         this->mavsdk_telemetry_messages.position.relative_altitude_m <= 1.0) {
-      this->mavsdk_action_plugin->set_takeoff_altitude(this->min_height + 1);
+      this->mavsdk_action_plugin->set_takeoff_altitude(this->min_height + 0.5);
       this->mavsdk_action_plugin->takeoff_async(
           [](mavsdk::Action::Result success) { (void)success; });
     }
