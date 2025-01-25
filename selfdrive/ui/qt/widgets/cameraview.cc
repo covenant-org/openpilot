@@ -1,4 +1,6 @@
 #include "selfdrive/ui/qt/widgets/cameraview.h"
+#include "system/loggerd/loggerd.h"
+
 
 #ifdef __APPLE__
 #include <OpenGL/gl3.h>
@@ -230,6 +232,7 @@ void CameraWidget::paintGL() {
   // no frame copy
   glActiveTexture(GL_TEXTURE0);
   glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, egl_images[frame->idx]);
+  LOGE("GL Error %d", glGetError());
   assert(glGetError() == GL_NO_ERROR);
 #else
   // fallback to copy
@@ -286,6 +289,7 @@ void CameraWidget::vipcConnected(VisionIpcClient *vipc_client) {
       EGL_NONE
     };
     egl_images[i] = eglCreateImageKHR(egl_display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, 0, img_attrs);
+    printf("egl error %d", eglGetError());
     assert(eglGetError() == EGL_SUCCESS);
   }
 #else
