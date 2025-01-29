@@ -19,7 +19,7 @@ class CarController(CarControllerBase):
     # [0.0, 1.0]
     accel = CC.actuators.accel
     if accel > 0:
-      accel *= 50
+      accel *= 100
     desired_speed = (CS.out.vEgo * 0.97) + accel
     if desired_speed > 10:
       desired_speed = 10

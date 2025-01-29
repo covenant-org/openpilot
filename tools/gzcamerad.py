@@ -9,10 +9,21 @@ from cereal import messaging, log
 from openpilot.common.realtime import Ratekeeper
 from threading import Thread
 from time import sleep
+from PIL import Image
 
 from openpilot.common.basedir import BASEDIR
 W, H = 1928, 1208
 MAX_BUFFER_SIZE=10*1024*1024
+
+def nv12_to_rgb(nv12: bytes | bytearray, size: tuple[int, int]) -> Image:
+  w, h = size
+  n = w * h
+  y, u, v = nv12[:n], nv12[n + 0::2], nv12[n + 1::2]
+  yuv = bytearray(3 * n)
+  yuv[0::3] = y
+  yuv[1::3] = Image.frombytes('L', (w // 2, h // 2), u).resize(size).tobytes()
+  yuv[2::3] = Image.frombytes('L', (w // 2, h // 2), v).resize(size).tobytes()
+  return Image.frombuffer('YCbCr', size, yuv).convert('RGB')
 
 class GZCamerad:
   """Simulates the camerad daemon"""
@@ -102,7 +113,7 @@ class GZCamerad:
       self.get_frame()
 
   def run(self):
-      rk = Ratekeeper(1000)
+      rk = Ratekeeper(100)
       while True:
         if self.last_frame is None:
           sleep(3)

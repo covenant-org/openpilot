@@ -129,11 +129,11 @@ void RemoteCamera::run() {
     auto framed = msg.initEvent().initRoadCameraState();
     framed.setFrameId(this->frame_id);
     framed.setTimestampEof(eof);
-    framed.setSensor(2);
+    framed.setSensor(cereal::FrameData::ImageSensor::OX03C10);
 
     this->pm->send("roadCameraState", msg);
     this->frame_id++;
-    usleep(100000);
+    usleep(50000);
   }
   this->fetch_thread.join();
 };
