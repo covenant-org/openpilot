@@ -11,6 +11,7 @@
 #undef Success
 #endif
 #include <capnp/serialize-packed.h>
+#include "common/util.h"
 
 class RemoteCamera {
 private:
