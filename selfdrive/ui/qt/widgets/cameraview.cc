@@ -265,7 +265,6 @@ void CameraWidget::vipcConnected(VisionIpcClient *vipc_client) {
   stream_width = vipc_client->buffers[0].width;
   stream_height = vipc_client->buffers[0].height;
   stream_stride = vipc_client->buffers[0].stride;
-  fprintf(stderr, "connected to %s %dx%d\n", stream_name, stream_width, stream_height);
 
 #ifdef QCOM2
   EGLDisplay egl_display = eglGetCurrentDisplay();
@@ -291,7 +290,7 @@ void CameraWidget::vipcConnected(VisionIpcClient *vipc_client) {
     };
     egl_images[i] = eglCreateImageKHR(egl_display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, 0, img_attrs);
     if(egl_images[i] == EGL_NO_IMAGE_KHR) {
-      std::cout << "eglCreateImageKHR failed with code " << std::hex << eglGetError() << "" << std::endl;
+      LOGE("EGL image error: 0x%x", eglGetError());
       assert(0);
     }
   }

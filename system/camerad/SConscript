@@ -1,6 +1,6 @@
-Import('env', 'arch', 'messaging', 'common', 'gpucommon', 'visionipc')
+Import('env', 'arch', 'messaging', 'common', 'gpucommon', 'visionipc', 'cereal')
 
-libs = [common, 'OpenCL', messaging, visionipc, gpucommon]
+libs = [common, 'OpenCL', messaging, visionipc, gpucommon, cereal]
 
 if arch != "Darwin":
   camera_obj = env.Object(['cameras/camera_qcom2.cc', 'cameras/camera_common.cc', 'cameras/remote_camera.cc', 'cameras/spectra.cc',

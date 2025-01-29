@@ -5,21 +5,22 @@
 #include <cstdio>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <arpa/inet.h> // inet_addr()
 #include <unistd.h>
 
+
 RemoteCamera::RemoteCamera(std::string addr, uint16_t port, uint16_t height,
-                           uint16_t width, cl_context ctx, cl_device device_id,
+                           uint16_t width, cl_context ctx, cl_device_id device_id,
                            VisionIpcServer *vipc_server)
     : ip(addr), port(port), height(height), width(width), ctx(ctx),
-      device_id(device_id), vipc_server(vipc_server),
-      last_frame(height * width * 3 / 2, "") {
+      vipc_server(vipc_server), last_frame(height * width * 3 / 2, ' ') {
+  (void) this->vipc_server;
   cl_int err = 0;
   this->queue = clCreateCommandQueueWithProperties(ctx, device_id, 0, &err);
   assert(err == CL_SUCCESS);
   char cl_arg[1024];
   sprintf(cl_arg,
-          " -DHEIGHT={%d} -DWIDTH={%d} -DRGB_STRIDE={%d} -DUV_WIDTH={%d} "
-          "-DUV_HEIGHT={%d} -DRGB_SIZE={%d} -DCL_DEBUG ",
+          " -DHEIGHT=%d -DWIDTH=%d -DRGB_STRIDE=%d -DUV_WIDTH=%d -DUV_HEIGHT=%d -DRGB_SIZE=%d -DCL_DEBUG ",
           height, width, width * 3, width / 2, height / 2, height * width);
   this->program = cl_program_from_file(
       ctx, device_id, "/data/openpilot/tools/rgb_to_nv12.cl", cl_arg);
@@ -46,12 +47,14 @@ void RemoteCamera::fetch_frame() {
       .sin_addr = {.s_addr = inet_addr(this->ip.c_str())}};
   int ret = connect(sfd, (sockaddr *)&server_addr, sizeof(server_addr));
   assert(ret == 0);
-  ::capnp::PackedFdMessageReader message(sfd);
-  Thumbnail::Reader frame = message.getRoot<Thumbnail>();
+  capnp::PackedFdMessageReader message(sfd);
+  cereal::Thumbnail::Reader frame = message.getRoot<cereal::Thumbnail>();
   cl_int err = 0;
   cl_mem cam_buf_cl =
-      clCreateBuffer(ctx, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                     width * height * 3, frame.data().data(), &err);
+      clCreateBuffer(ctx,
+      CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+      width * height * 3,
+      (void*)frame.getThumbnail().begin(), &err);
   assert(err == CL_SUCCESS);
   clSetKernelArg(kernel, 0, sizeof(cl_mem), &cam_buf_cl);
   clSetKernelArg(kernel, 1, sizeof(cl_mem), &output_cl);
@@ -74,6 +77,7 @@ void RemoteCamera::fetch_frame_thread() {
 
 void RemoteCamera::run() {
   this->fetch_thread = std::thread(&RemoteCamera::fetch_frame_thread, this);
+  this->fetch_thread.join();
 };
 
 void remote_camerad_thread() {

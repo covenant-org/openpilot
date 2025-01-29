@@ -6,6 +6,11 @@
 #ifdef QCOM2
 #include "CL/cl_ext_qcom.h"
 #endif
+#define EGL_NO_X11
+#ifdef Success
+#undef Success
+#endif
+#include <capnp/serialize-packed.h>
 
 class RemoteCamera {
 private:
@@ -16,7 +21,6 @@ private:
   uint16_t height;
   uint16_t width;
   cl_context ctx;
-  cl_device device_id;
   cl_command_queue queue;
   cl_program program;
   cl_kernel kernel;
@@ -25,7 +29,7 @@ private:
 
 public:
   explicit RemoteCamera(std::string addr, uint16_t port, uint16_t height,
-                        uint16_t width, cl_context ctx, cl_device device_id,
+                        uint16_t width, cl_context ctx, cl_device_id device_id,
                         VisionIpcServer *vipc_server);
   ~RemoteCamera();
   void fetch_frame_thread();
