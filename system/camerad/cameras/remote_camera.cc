@@ -7,6 +7,9 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include "common/swaglog.h"
+
+
 
 extern ExitHandler do_exit;
 
@@ -31,6 +34,7 @@ RemoteCamera::RemoteCamera(std::string addr, uint16_t port, uint16_t height,
   this->output_cl = clCreateBuffer(ctx, CL_MEM_WRITE_ONLY,
                                    width * height * 3 / 2, NULL, &err);
   assert(err == CL_SUCCESS);
+  LOGW("Created remote camera\n");
 }
 
 RemoteCamera::~RemoteCamera() {
@@ -41,6 +45,7 @@ RemoteCamera::~RemoteCamera() {
 }
 
 void RemoteCamera::fetch_frame() {
+  LOGW("Attempting to fetch frame");
   int sfd = socket(AF_INET, SOCK_STREAM, 0);
   assert(sfd >= 0);
   sockaddr_in server_addr = {
@@ -48,9 +53,13 @@ void RemoteCamera::fetch_frame() {
       .sin_port = htons(this->port),
       .sin_addr = {.s_addr = inet_addr(this->ip.c_str())}};
   int ret = connect(sfd, (sockaddr *)&server_addr, sizeof(server_addr));
+  char sendbuf[1] = {0};
+  send(sfd, sendbuf, 1, 0);
+  LOGW("Connected to remote");
   assert(ret == 0);
   capnp::PackedFdMessageReader message(sfd);
   cereal::Thumbnail::Reader frame = message.getRoot<cereal::Thumbnail>();
+  LOGW("Got frame");
   cl_int err = 0;
   cl_mem cam_buf_cl = clCreateBuffer(
       ctx, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, width * height * 3,
@@ -61,15 +70,21 @@ void RemoteCamera::fetch_frame() {
   size_t global_size[] = {static_cast<size_t>(width / 4),
                           static_cast<size_t>(height / 4)};
   cl_event event;
+  clFinish(queue);
   err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, global_size, NULL, 0,
                                NULL, &event);
   assert(err == CL_SUCCESS);
   clWaitForEvents(1, &event);
   assert(clReleaseEvent(event) == CL_SUCCESS);
+  LOGW("Converted");
+  clFinish(queue);
   clEnqueueReadBuffer(queue, output_cl, CL_TRUE, 0, width * height * 3 / 2,
                       this->last_frame.data(), 0, NULL, NULL);
+  clFinish(queue);
   clReleaseMemObject(cam_buf_cl);
   close(sfd);
+  this->recv_frame = true;
+  LOGW("Saved frame");
 };
 
 void RemoteCamera::fetch_frame_thread() {
@@ -79,13 +94,15 @@ void RemoteCamera::fetch_frame_thread() {
 };
 
 void RemoteCamera::init() {
-  asset(this->vipc_server != nullptr);
+  assert(this->vipc_server != nullptr);
   this->vipc_server->create_buffers(VisionStreamType::VISION_STREAM_ROAD, 5,
                                     false, this->width, this->height);
+  this->vipc_server->start_listener();
 }
 
 void RemoteCamera::run() {
   this->fetch_thread = std::thread(&RemoteCamera::fetch_frame_thread, this);
+  this->init();
   while (!do_exit) {
     if (!this->recv_frame) {
       sleep(1);
@@ -93,22 +110,25 @@ void RemoteCamera::run() {
     }
     auto buf =
         this->vipc_server->get_buffer(VisionStreamType::VISION_STREAM_ROAD);
-    clEnqueueWriteBuffer(queue, buf->cl_buf, CL_TRUE, 0,
+    clFinish(queue);
+    clEnqueueWriteBuffer(queue, buf->buf_cl, CL_TRUE, 0,
                          this->last_frame.size(),
                          (void *)this->last_frame.data(), 0, NULL, NULL);
     VisionIpcBufExtra extra = {
         this->frame_id,
-        this->frame_id * 0.05 * 1e9,
-        this->frame_id * 0.05 * 1e9,
+        static_cast<uint64_t>(this->frame_id * 0.05 * 1e9),
+        static_cast<uint64_t>(this->frame_id * 0.05 * 1e9),
     };
     buf->set_frame_id(this->frame_id);
     this->vipc_server->send(buf, &extra);
     this->frame_id++;
+    usleep(100000);
   }
   this->fetch_thread.join();
 };
 
 void remote_camerad_thread() {
+  LOGW("Running remote camera thread\n");
   cl_device_id device_id = cl_get_device_id(CL_DEVICE_TYPE_DEFAULT);
 #ifdef QCOM2
   const cl_context_properties props[] = {CL_CONTEXT_PRIORITY_HINT_QCOM,
