@@ -1,4 +1,5 @@
 #include "remote_camera.h"
+#include "common/swaglog.h"
 #include <CL/cl.h>
 #include <arpa/inet.h> // inet_addr()
 #include <cassert>
@@ -7,9 +8,6 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include "common/swaglog.h"
-
-
 
 extern ExitHandler do_exit;
 
@@ -42,6 +40,9 @@ RemoteCamera::~RemoteCamera() {
   clReleaseProgram(program);
   clReleaseMemObject(output_cl);
   clReleaseCommandQueue(queue);
+  if (this->pm != nullptr) {
+    delete this->pm;
+  }
 }
 
 void RemoteCamera::fetch_frame() {
@@ -98,6 +99,7 @@ void RemoteCamera::init() {
   this->vipc_server->create_buffers(VisionStreamType::VISION_STREAM_ROAD, 5,
                                     false, this->width, this->height);
   this->vipc_server->start_listener();
+  this->pm = new PubMaster({"roadCameraState"});
 }
 
 void RemoteCamera::run() {
@@ -114,13 +116,22 @@ void RemoteCamera::run() {
     clEnqueueWriteBuffer(queue, buf->buf_cl, CL_TRUE, 0,
                          this->last_frame.size(),
                          (void *)this->last_frame.data(), 0, NULL, NULL);
+    uint64_t eof = static_cast<uint64_t>(this->frame_id * 0.05 * 1e9);
     VisionIpcBufExtra extra = {
         this->frame_id,
-        static_cast<uint64_t>(this->frame_id * 0.05 * 1e9),
-        static_cast<uint64_t>(this->frame_id * 0.05 * 1e9),
+        eof,
+        eof,
     };
     buf->set_frame_id(this->frame_id);
     this->vipc_server->send(buf, &extra);
+
+    MessageBuilder msg;
+    auto framed = msg.initEvent().initRoadCameraState();
+    framed.setFrameId(this->frame_id);
+    framed.setTimestampEof(eof);
+    framed.setSensor(2);
+
+    this->pm->send("roadCameraState", msg);
     this->frame_id++;
     usleep(100000);
   }

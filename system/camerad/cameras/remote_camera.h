@@ -12,6 +12,7 @@
 #endif
 #include <capnp/serialize-packed.h>
 #include "common/util.h"
+#include "cereal/messaging/messaging.h"
 
 class RemoteCamera {
 private:
@@ -29,6 +30,7 @@ private:
   cl_kernel kernel;
   VisionIpcServer *vipc_server;
   cl_mem output_cl;
+  PubMaster *pm;
 
 public:
   explicit RemoteCamera(std::string addr, uint16_t port, uint16_t height,
