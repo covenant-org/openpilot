@@ -16,10 +16,12 @@ class RemoteCamera {
 private:
   std::thread fetch_thread;
   std::string last_frame;
+  bool recv_frame;
   std::string ip;
   uint16_t port;
   uint16_t height;
   uint16_t width;
+  unsigned int frame_id = 0;
   cl_context ctx;
   cl_command_queue queue;
   cl_program program;
@@ -35,6 +37,7 @@ public:
   void fetch_frame_thread();
   void fetch_frame();
   void run();
+  void init();
 };
 
 void remote_camerad_thread();
