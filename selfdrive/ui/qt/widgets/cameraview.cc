@@ -232,7 +232,6 @@ void CameraWidget::paintGL() {
   // no frame copy
   glActiveTexture(GL_TEXTURE0);
   glEGLImageTargetTexture2DOES(GL_TEXTURE_EXTERNAL_OES, egl_images[frame->idx]);
-  LOGE("GL Error %d", glGetError());
   assert(glGetError() == GL_NO_ERROR);
 #else
   // fallback to copy
