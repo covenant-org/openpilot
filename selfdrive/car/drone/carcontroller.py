@@ -18,9 +18,7 @@ class CarController(CarControllerBase):
   def update(self, CC, CS, now_nanos):
     # [0.0, 1.0]
     accel = CC.actuators.accel
-    if accel > 0:
-      accel *= 100
-    desired_speed = (CS.out.vEgo * 0.97) + accel
+    desired_speed = (CS.out.vEgo) + accel
     if desired_speed > 10:
       desired_speed = 10
     if desired_speed < 0:
@@ -45,7 +43,6 @@ class CarController(CarControllerBase):
     new_actuators.steerOutputCan = turn_degrees
     new_actuators.steeringAngleDeg = math.degrees(turn)
     new_actuators.speed = desired_speed
-    new_actuators.accel = accel
 
     self.frame += 1
     return new_actuators, can_sends
