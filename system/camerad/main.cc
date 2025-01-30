@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
   int ret = util::set_core_affinity({6});
   assert(ret == 0 || Params().getBool("IsOffroad")); // failure ok while offroad due to offlining cores
 
-  std::string use_remote_camera = getenv("REMOTE_CAMERA", "0");
+  std::string use_remote_camera = util::getenv("REMOTE_CAMERA", "0");
   if (use_remote_camera == "1") {
     remote_camerad_thread();
     return 0;
