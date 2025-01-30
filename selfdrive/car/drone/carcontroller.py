@@ -7,13 +7,13 @@ from openpilot.selfdrive.car.interfaces import CarControllerBase
 from openpilot.selfdrive.controls.lib.pid import PIDController
 
 MAX_ANGLE=math.radians(45)
-DESIRED_ALTITUDE=1.5
+DESIRED_ALTITUDE=2.0
 
 class CarController(CarControllerBase):
   def __init__(self, dbc_name, CP, VM):
     self.frame = 0
     self.packer = CANPacker(dbc_name)
-    self.altitude_pid = PIDController(0.70, k_i=0.5, rate=1/DT_CTRL)
+    self.altitude_pid = PIDController(0.65, k_i=0.55, rate=1/DT_CTRL)
 
   def update(self, CC, CS, now_nanos):
     # [0.0, 1.0]
