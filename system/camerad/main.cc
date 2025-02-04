@@ -5,6 +5,7 @@
 
 #include "common/params.h"
 #include "common/util.h"
+#include "common/swaglog.h"
 
 int main(int argc, char *argv[]) {
   // doesn't need RT priority since we're using isolcpus
@@ -13,6 +14,7 @@ int main(int argc, char *argv[]) {
 
   std::string use_remote_camera = util::getenv("REMOTE_CAMERA", "0");
   if (use_remote_camera == "1") {
+    LOGW("Using remote camera");
     remote_camerad_thread();
     return 0;
   }
