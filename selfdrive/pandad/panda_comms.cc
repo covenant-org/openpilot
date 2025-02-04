@@ -17,6 +17,7 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <string>
 #include <tuple>
 #include <unistd.h>
 
@@ -316,12 +317,23 @@ bool PandaMavlinkHandle::connect_autopilot() {
       [&](mavsdk::Telemetry::PositionVelocityNed position_velocity_ned) {
         this->mavsdk_telemetry_messages.position_velocity_ned =
             position_velocity_ned;
+        if (!this->ignited) {
+          this->height_error_acc += position_velocity_ned.relative_altitude_m;
+          this->height_msgs_count++;
+          this->base_height = this->height_error_acc / this->height_msgs_count;
+        }
       });
   this->mavsdk_telemetry_plugin->subscribe_position(
       [&](mavsdk::Telemetry::Position position) {
         this->mavsdk_telemetry_messages.position = position;
       });
   this->mavsdk_telemetry_plugin->subscribe_armed([&](bool armed) {
+    // Falling edge
+    if (this->ignited && !armed) {
+      this->base_height = 0;
+      this->height_error_acc = 0;
+      this->height_msgs_count = 0;
+    }
     this->ignited = armed;
     if (!armed) {
       this->should_start_offboard = true;
@@ -344,6 +356,7 @@ PandaMavlinkHandle::PandaMavlinkHandle(std::string serial)
   if (!this->connect_autopilot()) {
     throw std::runtime_error("Failed to connect to autopilot");
   }
+  this->min_height = std::stof(util::getenv("DRONE_HEIGHT", "1.0"));
 }
 
 PandaMavlinkHandle::~PandaMavlinkHandle() { this->connected = false; }
@@ -634,9 +647,12 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
       int16_t speed = frame.dat[2] << 8 | frame.dat[3];
       int16_t down = frame.dat[4] << 8 | frame.dat[5];
       printf("angle %d, speed %d, down %d\n", angle, speed, down);
-      if (this->mavsdk_telemetry_messages.position.relative_altitude_m >=
-              this->min_height &&
-          !this->mavsdk_offboard_plugin->is_active()) {
+      float corrected_height =
+          this->mavsdk_telemetry_messages.position.relative_altitude_m -
+          this->base_height;
+      if (corrected_height >= this->min_height &&
+          !this->mavsdk_offboard_plugin->is_active() &&
+          this->should_start_offboard) {
         mavsdk::Offboard::VelocityBodyYawspeed stay{};
         this->mavsdk_offboard_plugin->set_velocity_body(stay);
         mavsdk::Offboard::Result result = this->mavsdk_offboard_plugin->start();
@@ -743,6 +759,7 @@ int PandaMavlinkHandle::bulk_read(unsigned char endpoint, unsigned char *data,
     int16_t yaw_rate_deg = static_cast<int16_t>(yaw_rate * 10);
     float altitude =
         this->mavsdk_telemetry_messages.position.relative_altitude_m;
+    altitude -= this->base_height;
     int16_t altitude_m = static_cast<int16_t>(altitude * 100);
     std::string content = {
         (char)((yaw_rate_deg & 0xFF00) >> 8), (char)(yaw_rate_deg & 0xFF),
