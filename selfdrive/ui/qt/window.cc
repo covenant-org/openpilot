@@ -89,6 +89,9 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
       // ignore events when device is awakened by resetInteractiveTimeout
       ignore = !device()->isAwake();
       device()->resetInteractiveTimeout();
+      QString filePath = "processed_screenshot.png";
+      auto image = this->grab();
+      asset(image.save(filePath, "PNG"));
       break;
     }
     default:

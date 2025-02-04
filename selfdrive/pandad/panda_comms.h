@@ -156,6 +156,9 @@ private:
   uint32_t uptime = 0;
   bool ignited = 0;
   float min_height = 0.8;
+  float base_height = 0.0;
+  float height_error_acc = 0.0;
+  uint height_msgs_count = 0;
   std::string mavlink_uri = "serial:///dev/ttyACM0:57600";
   std::string vin = "JH4DB1542MS007683";
   std::string fw_version = "ncl.0.01";

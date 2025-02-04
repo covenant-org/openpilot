@@ -8,7 +8,7 @@ from openpilot.selfdrive.car.interfaces import CarControllerBase
 from openpilot.selfdrive.controls.lib.pid import PIDController
 
 MAX_ANGLE=math.radians(45)
-DESIRED_ALTITUDE=float(os.getenv("DRONE_HEIGHT", 0.8))
+DESIRED_ALTITUDE=float(os.getenv("DRONE_HEIGHT", 1.0))
 
 class CarController(CarControllerBase):
   def __init__(self, dbc_name, CP, VM):
