@@ -24,12 +24,8 @@ private:
   uint16_t height;
   uint16_t width;
   unsigned int frame_id = 0;
-  cl_context ctx;
   cl_command_queue queue;
-  cl_program program;
-  cl_kernel kernel;
   VisionIpcServer *vipc_server;
-  cl_mem output_cl;
   PubMaster *pm;
 
 public:
