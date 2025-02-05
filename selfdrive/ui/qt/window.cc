@@ -1,6 +1,8 @@
 #include "selfdrive/ui/qt/window.h"
 
 #include <QFontDatabase>
+#include <cassert>
+#include "common/swaglog.h"
 
 #include "system/hardware/hw.h"
 
@@ -76,6 +78,12 @@ void MainWindow::closeSettings() {
   if (uiState()->scene.started) {
     homeWindow->showSidebar(false);
   }
+  QString filePath = "processed_screenshot.png";
+  auto image = this->grab();
+  LOGW("Main window grabed");
+  if(!image.save(filePath, "PNG")){
+    LOGE("Main window not saved");
+  }
 }
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
@@ -89,9 +97,6 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
       // ignore events when device is awakened by resetInteractiveTimeout
       ignore = !device()->isAwake();
       device()->resetInteractiveTimeout();
-      QString filePath = "processed_screenshot.png";
-      auto image = this->grab();
-      asset(image.save(filePath, "PNG"));
       break;
     }
     default:

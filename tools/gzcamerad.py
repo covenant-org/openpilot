@@ -12,7 +12,7 @@ from time import sleep
 from PIL import Image
 
 from openpilot.common.basedir import BASEDIR
-W, H = 1928, 1208
+W, H = 960, 540
 MAX_BUFFER_SIZE=10*1024*1024
 
 def nv12_to_rgb(nv12: bytes | bytearray, size: tuple[int, int]) -> Image:
@@ -103,10 +103,10 @@ class GZCamerad:
         print("Received frame")
 
     thumbnail = log.Thumbnail.from_bytes_packed(data)
-    original = np.frombuffer(thumbnail.thumbnail, dtype=np.uint8).reshape((1080, 1920, 3))
-    frame = np.pad(original, [(0, H - 1080), (0, W - 1920), (0, 0)], mode='constant', constant_values=0)
-    self.last_frame = self.rgb_to_yuv(frame)
-    return frame
+    original = np.frombuffer(thumbnail.thumbnail, dtype=np.uint8).reshape((540, 960, 3))
+    self.last_frame = self.rgb_to_yuv(original)
+    nv12_to_rgb(self.last_frame, (W,H)).save("/tmp/remote.png")
+    return original
 
   def get_frame_thread(self):
     while True:

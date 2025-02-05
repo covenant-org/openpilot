@@ -317,15 +317,15 @@ bool PandaMavlinkHandle::connect_autopilot() {
       [&](mavsdk::Telemetry::PositionVelocityNed position_velocity_ned) {
         this->mavsdk_telemetry_messages.position_velocity_ned =
             position_velocity_ned;
-        if (!this->ignited) {
-          this->height_error_acc += position_velocity_ned.relative_altitude_m;
-          this->height_msgs_count++;
-          this->base_height = this->height_error_acc / this->height_msgs_count;
-        }
       });
   this->mavsdk_telemetry_plugin->subscribe_position(
       [&](mavsdk::Telemetry::Position position) {
         this->mavsdk_telemetry_messages.position = position;
+        if (!this->ignited) {
+          this->height_error_acc += position.relative_altitude_m;
+          this->height_msgs_count++;
+          this->base_height = this->height_error_acc / this->height_msgs_count;
+        }
       });
   this->mavsdk_telemetry_plugin->subscribe_armed([&](bool armed) {
     // Falling edge
