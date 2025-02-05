@@ -1,17 +1,47 @@
 #include "selfdrive/ui/qt/window.h"
 
+#include "common/swaglog.h"
 #include <QFontDatabase>
 #include <cassert>
-#include "common/swaglog.h"
 
 #include "system/hardware/hw.h"
 #include "window.h"
-#include <thread>
+#include <ctime>
+#include <errno.h>
 #include <string>
+#include <sys/stat.h>
+#include <thread>
+#include <unistd.h>
+#include <assert.h>
 
 MainWindow::MainWindow(QWidget *parent) : QWidget(parent) {
   main_layout = new QStackedLayout(this);
   main_layout->setMargin(0);
+  screenshots_path = "/data/media/0/openpilot_screenshots";
+  std::stat buf;
+  if (lstat(screenshots_path.c_str(), &buf) != 0) {
+    if (errno == ENOENT) {
+      mkdir(screenshots_path.c_str(), S_IRWXU);
+    } else {
+      assert(0);
+    }
+  }
+  time_t timestamp = time(&timestamp);
+  tm datetime = *localtime(&timestamp);
+  std::string date = std::to_string(datetime.tm_year + 1900) + "-" +
+                     std::to_string(datetime.tm_mon + 1) + "-" +
+                     std::to_string(datetime.tm_mday);
+  std::string time = std::to_string(datetime.tm_hour) +
+                     std::to_string(datetime.tm_min) +
+                     std::to_string(datetime.tm_sec);
+  screenshots_path = screenshots_path + "/" + date + "_" + time;
+  if (lstat(screenshots_path.c_str(), &buf) != 0) {
+    if (errno == ENOENT) {
+      mkdir(screenshots_path.c_str(), S_IRWXU);
+    } else {
+      assert(0);
+    }
+  }
 
   homeWindow = new HomeWindow(this);
   main_layout->addWidget(homeWindow);
@@ -90,31 +120,30 @@ void MainWindow::closeSettings() {
 }
 
 void MainWindow::takeScreenshot() {
-    std::string filename = "screenshots/" + std::to_string(this->nextScreenshot) + ".png";
-    QString filePath = filename.c_str();
-    this->nextScreenshot++;
-    auto image = this->grab();
-    std::thread t([image, filePath]{
-      image.save(filePath, "PNG");
-    });
-    t.detach();
+  std::string filename =
+      this->screenshots_path + std::to_string(this->nextScreenshot) + ".png";
+  QString filePath = filename.c_str();
+  this->nextScreenshot++;
+  auto image = this->grab();
+  std::thread t([image, filePath] { image.save(filePath, "PNG"); });
+  t.detach();
 }
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
   bool ignore = false;
   switch (event->type()) {
-    case QEvent::TouchBegin:
-    case QEvent::TouchUpdate:
-    case QEvent::TouchEnd:
-    case QEvent::MouseButtonPress:
-    case QEvent::MouseMove: {
-      // ignore events when device is awakened by resetInteractiveTimeout
-      ignore = !device()->isAwake();
-      device()->resetInteractiveTimeout();
-      break;
-    }
-    default:
-      break;
+  case QEvent::TouchBegin:
+  case QEvent::TouchUpdate:
+  case QEvent::TouchEnd:
+  case QEvent::MouseButtonPress:
+  case QEvent::MouseMove: {
+    // ignore events when device is awakened by resetInteractiveTimeout
+    ignore = !device()->isAwake();
+    device()->resetInteractiveTimeout();
+    break;
+  }
+  default:
+    break;
   }
   return ignore;
 }

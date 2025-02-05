@@ -25,4 +25,5 @@ private:
   OnboardingWindow *onboardingWindow;
   QTimer *screenshotTimer;
   uint nextScreenshot = 0;
+  std::string screenshots_path;
 };
