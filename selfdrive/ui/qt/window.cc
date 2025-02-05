@@ -7,6 +7,7 @@
 #include "system/hardware/hw.h"
 #include "window.h"
 #include <thread>
+#include <string>
 
 MainWindow::MainWindow(QWidget *parent) : QWidget(parent) {
   main_layout = new QStackedLayout(this);
@@ -89,13 +90,14 @@ void MainWindow::closeSettings() {
 }
 
 void MainWindow::takeScreenshot() {
-  std::thread t([this]() {
-    QString filePath = "screenshots/" + this->nextScreenshot + ".png";
-    auto image = this->grab();
-    image.save(filePath, "PNG");
+    std::string filename = "screenshots/" + std::to_string(this->nextScreenshot) + ".png";
+    QString filePath = filename.c_str();
     this->nextScreenshot++;
-  });
-  t.detach();
+    auto image = this->grab();
+    std::thread t([image, filePath]{
+      image.save(filePath, "PNG");
+    });
+    t.detach();
 }
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
