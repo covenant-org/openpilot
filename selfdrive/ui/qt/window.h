@@ -16,10 +16,13 @@ public:
 private:
   bool eventFilter(QObject *obj, QEvent *event) override;
   void openSettings(int index = 0, const QString &param = "");
+  void takeScreenshot();
   void closeSettings();
 
   QStackedLayout *main_layout;
   HomeWindow *homeWindow;
   SettingsWindow *settingsWindow;
   OnboardingWindow *onboardingWindow;
+  QTimer *screenshotTimer;
+  uint nextScreenshot = 0;
 };

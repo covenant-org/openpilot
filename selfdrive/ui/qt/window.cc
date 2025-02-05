@@ -5,6 +5,8 @@
 #include "common/swaglog.h"
 
 #include "system/hardware/hw.h"
+#include "window.h"
+#include <thread>
 
 MainWindow::MainWindow(QWidget *parent) : QWidget(parent) {
   main_layout = new QStackedLayout(this);
@@ -12,25 +14,31 @@ MainWindow::MainWindow(QWidget *parent) : QWidget(parent) {
 
   homeWindow = new HomeWindow(this);
   main_layout->addWidget(homeWindow);
-  QObject::connect(homeWindow, &HomeWindow::openSettings, this, &MainWindow::openSettings);
-  QObject::connect(homeWindow, &HomeWindow::closeSettings, this, &MainWindow::closeSettings);
+  QObject::connect(homeWindow, &HomeWindow::openSettings, this,
+                   &MainWindow::openSettings);
+  QObject::connect(homeWindow, &HomeWindow::closeSettings, this,
+                   &MainWindow::closeSettings);
 
   settingsWindow = new SettingsWindow(this);
   main_layout->addWidget(settingsWindow);
-  QObject::connect(settingsWindow, &SettingsWindow::closeSettings, this, &MainWindow::closeSettings);
+  QObject::connect(settingsWindow, &SettingsWindow::closeSettings, this,
+                   &MainWindow::closeSettings);
   QObject::connect(settingsWindow, &SettingsWindow::reviewTrainingGuide, [=]() {
     onboardingWindow->showTrainingGuide();
     main_layout->setCurrentWidget(onboardingWindow);
   });
-  QObject::connect(settingsWindow, &SettingsWindow::showDriverView, [=] {
-    homeWindow->showDriverView(true);
-  });
+  QObject::connect(settingsWindow, &SettingsWindow::showDriverView,
+                   [=] { homeWindow->showDriverView(true); });
+
+  screenshotTimer = new QTimer(this);
+  QObject::connect(screenshotTimer, &QTimer::timeout, this,
+                   &MainWindow::takeScreenshot);
+  screenshotTimer->start(300);
 
   onboardingWindow = new OnboardingWindow(this);
   main_layout->addWidget(onboardingWindow);
-  QObject::connect(onboardingWindow, &OnboardingWindow::onboardingDone, [=]() {
-    main_layout->setCurrentWidget(homeWindow);
-  });
+  QObject::connect(onboardingWindow, &OnboardingWindow::onboardingDone,
+                   [=]() { main_layout->setCurrentWidget(homeWindow); });
   if (!onboardingWindow->completed()) {
     main_layout->setCurrentWidget(onboardingWindow);
   }
@@ -78,12 +86,16 @@ void MainWindow::closeSettings() {
   if (uiState()->scene.started) {
     homeWindow->showSidebar(false);
   }
-  QString filePath = "processed_screenshot.png";
-  auto image = this->grab();
-  LOGW("Main window grabed");
-  if(!image.save(filePath, "PNG")){
-    LOGE("Main window not saved");
-  }
+}
+
+void MainWindow::takeScreenshot() {
+  std::thread t([this]() {
+    QString filePath = "screenshots/" + this->nextScreenshot + ".png";
+    auto image = this->grab();
+    image.save(filePath, "PNG");
+    this->nextScreenshot++;
+  });
+  t.detach();
 }
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
