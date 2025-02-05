@@ -114,10 +114,10 @@ void remote_camerad_thread(std::string ip) {
   cl_context context =
       CL_CHECK_ERR(clCreateContext(NULL, 1, &device_id, NULL, NULL, &err));
 #endif
-  string::size_t split_port_pos = ip.find(":");
-  assert(split_port_pos != string::npos);
+  size_t split_port_pos = ip.find(":");
+  assert(split_port_pos != std::string::npos);
   VisionIpcServer vipc_server("camerad", device_id, context);
-  RemoteCamera cam(ip.substr(0, split_port_pos), atoi(ip.substr(split_port_pos + 1).c_str()), 4069, 720, 1280, context, device_id,
+  RemoteCamera cam(ip.substr(0, split_port_pos), atoi(ip.substr(split_port_pos + 1).c_str()), 720, 1280, context, device_id,
                    &vipc_server);
   cam.run();
 };

@@ -39,4 +39,4 @@ public:
   void init();
 };
 
-void remote_camerad_thread();
+void remote_camerad_thread(std::string);

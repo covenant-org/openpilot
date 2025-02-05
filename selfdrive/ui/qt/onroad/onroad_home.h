@@ -8,11 +8,11 @@ class OnroadWindow : public QWidget {
 
 public:
   OnroadWindow(QWidget* parent = 0);
+  AnnotatedCameraWidget *nvg;
 
 private:
   void paintEvent(QPaintEvent *event);
   OnroadAlerts *alerts;
-  AnnotatedCameraWidget *nvg;
   QColor bg = bg_colors[STATUS_DISENGAGED];
   QHBoxLayout* split;
 

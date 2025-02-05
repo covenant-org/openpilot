@@ -1,4 +1,5 @@
 #include "selfdrive/ui/qt/window.h"
+#include "selfdrive/ui/qt/qt_window.h"
 
 #include "common/swaglog.h"
 #include <QFontDatabase>
@@ -10,15 +11,17 @@
 #include <errno.h>
 #include <string>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <thread>
 #include <unistd.h>
 #include <assert.h>
+#include <cstdio>
 
 MainWindow::MainWindow(QWidget *parent) : QWidget(parent) {
   main_layout = new QStackedLayout(this);
   main_layout->setMargin(0);
   screenshots_path = "/data/media/0/openpilot_screenshots";
-  std::stat buf;
+  struct stat buf;
   if (lstat(screenshots_path.c_str(), &buf) != 0) {
     if (errno == ENOENT) {
       mkdir(screenshots_path.c_str(), S_IRWXU);
@@ -28,12 +31,12 @@ MainWindow::MainWindow(QWidget *parent) : QWidget(parent) {
   }
   time_t timestamp = time(&timestamp);
   tm datetime = *localtime(&timestamp);
-  std::string date = std::to_string(datetime.tm_year + 1900) + "-" +
-                     std::to_string(datetime.tm_mon + 1) + "-" +
-                     std::to_string(datetime.tm_mday);
-  std::string time = std::to_string(datetime.tm_hour) +
-                     std::to_string(datetime.tm_min) +
-                     std::to_string(datetime.tm_sec);
+  char date[100];
+  snprintf(date, 100, "%d-%02d-%02d", datetime.tm_year + 1900,
+    datetime.tm_mon + 1, datetime.tm_mday);
+  char time[100];
+  snprintf(time, 100, "%02d:%02d:%02d", datetime.tm_hour,
+   datetime.tm_min, datetime.tm_sec);
   screenshots_path = screenshots_path + "/" + date + "_" + time;
   if (lstat(screenshots_path.c_str(), &buf) != 0) {
     if (errno == ENOENT) {
@@ -42,7 +45,6 @@ MainWindow::MainWindow(QWidget *parent) : QWidget(parent) {
       assert(0);
     }
   }
-
   homeWindow = new HomeWindow(this);
   main_layout->addWidget(homeWindow);
   QObject::connect(homeWindow, &HomeWindow::openSettings, this,
@@ -120,11 +122,20 @@ void MainWindow::closeSettings() {
 }
 
 void MainWindow::takeScreenshot() {
-  std::string filename =
-      this->screenshots_path + std::to_string(this->nextScreenshot) + ".png";
-  QString filePath = filename.c_str();
-  this->nextScreenshot++;
+    LOGE("Taking a screenshot");
+  char filename[300];
+  snprintf(filename, 300, "%s/%010d.png", screenshots_path.c_str(), this->nextScreenshot);
+  QString filePath = filename;
   auto image = this->grab();
+  auto annotated = this->homeWindow->onroad->nvg;
+  if (annotated!= nullptr && annotated->isVisible()){
+    auto openglImage = annotated->grabFramebuffer();
+    QPainter painter(&image);
+    QPoint openglPos = annotated->mapTo(this->homeWindow->onroad, QPoint(0,0));
+    painter.drawImage(openglPos, openglImage);
+    painter.end();
+  }
+  this->nextScreenshot++;
   std::thread t([image, filePath] { image.save(filePath, "PNG"); });
   t.detach();
 }

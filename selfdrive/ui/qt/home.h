@@ -46,6 +46,7 @@ class HomeWindow : public QWidget {
 
 public:
   explicit HomeWindow(QWidget* parent = 0);
+  OnroadWindow *onroad;
 
 signals:
   void openSettings(int index = 0, const QString &param = "");
@@ -63,7 +64,6 @@ protected:
 private:
   Sidebar *sidebar;
   OffroadHome *home;
-  OnroadWindow *onroad;
   BodyWindow *body;
   DriverViewWindow *driver_view;
   QStackedLayout *slayout;
