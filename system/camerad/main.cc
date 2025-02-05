@@ -12,10 +12,10 @@ int main(int argc, char *argv[]) {
   int ret = util::set_core_affinity({6});
   assert(ret == 0 || Params().getBool("IsOffroad")); // failure ok while offroad due to offlining cores
 
-  std::string use_remote_camera = util::getenv("REMOTE_CAMERA", "0");
-  if (use_remote_camera == "1") {
+  std::string use_remote_camera = util::getenv("REMOTE_CAMERA", "");
+  if (use_remote_camera.length() > 0) {
     LOGW("Using remote camera");
-    remote_camerad_thread();
+    remote_camerad_thread(use_remote_camera);
     return 0;
   }
   camerad_thread();

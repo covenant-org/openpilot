@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <string>
 
 extern ExitHandler do_exit;
 
@@ -101,7 +102,7 @@ void RemoteCamera::run() {
   this->fetch_thread.join();
 };
 
-void remote_camerad_thread() {
+void remote_camerad_thread(std::string ip) {
   LOGW("Running remote camera thread\n");
   cl_device_id device_id = cl_get_device_id(CL_DEVICE_TYPE_DEFAULT);
 #ifdef QCOM2
@@ -113,8 +114,10 @@ void remote_camerad_thread() {
   cl_context context =
       CL_CHECK_ERR(clCreateContext(NULL, 1, &device_id, NULL, NULL, &err));
 #endif
+  string::size_t split_port_pos = ip.find(":");
+  assert(split_port_pos != string::npos);
   VisionIpcServer vipc_server("camerad", device_id, context);
-  RemoteCamera cam("192.168.100.100", 4069, 720, 1280, context, device_id,
+  RemoteCamera cam(ip.substr(0, split_port_pos), atoi(ip.substr(split_port_pos + 1).c_str()), 4069, 720, 1280, context, device_id,
                    &vipc_server);
   cam.run();
 };
