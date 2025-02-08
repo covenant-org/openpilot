@@ -354,7 +354,11 @@ PandaMavlinkHandle::PandaMavlinkHandle(std::string serial)
           mavsdk::Mavsdk::ComponentType::GroundStation)}} {
   this->hw_serial = serial;
   if (!this->connect_autopilot()) {
-    throw std::runtime_error("Failed to connect to autopilot");
+    //throw std::runtime_error("Failed to connect to autopilot");
+    this->ignited = true;
+    this->drone = false;
+  }else{
+    this->drone = true;
   }
   this->min_height = std::stof(util::getenv("DRONE_HEIGHT", "1.0"));
 }
@@ -647,21 +651,22 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
       int16_t speed = frame.dat[2] << 8 | frame.dat[3];
       int16_t down = frame.dat[4] << 8 | frame.dat[5];
       printf("angle %d, speed %d, down %d\n", angle, speed, down);
-      float corrected_height =
-          this->mavsdk_telemetry_messages.position.relative_altitude_m -
-          this->base_height;
-      if (corrected_height >= this->min_height &&
-          !this->mavsdk_offboard_plugin->is_active() &&
-          this->should_start_offboard) {
-        mavsdk::Offboard::VelocityBodyYawspeed stay{};
-        this->mavsdk_offboard_plugin->set_velocity_body(stay);
-        mavsdk::Offboard::Result result = this->mavsdk_offboard_plugin->start();
-        if (result != mavsdk::Offboard::Result::Success) {
-          LOGE("failed to start offboard");
-        } else {
-          this->should_start_offboard = false;
-        }
+      if(!this->drone) continue;
+    float corrected_height =
+        this->mavsdk_telemetry_messages.position.relative_altitude_m -
+        this->base_height;
+    if (corrected_height >= this->min_height &&
+        !this->mavsdk_offboard_plugin->is_active() &&
+        this->should_start_offboard) {
+      mavsdk::Offboard::VelocityBodyYawspeed stay{};
+      this->mavsdk_offboard_plugin->set_velocity_body(stay);
+      mavsdk::Offboard::Result result = this->mavsdk_offboard_plugin->start();
+      if (result != mavsdk::Offboard::Result::Success) {
+        LOGE("failed to start offboard");
+      } else {
+        this->should_start_offboard = false;
       }
+    }
       if (!this->mavsdk_offboard_plugin->is_active())
         continue;
       mavsdk::Offboard::VelocityBodyYawspeed command{};

@@ -4,7 +4,11 @@ libs = ['m', 'pthread', common, 'jpeg', 'OpenCL', 'yuv', messaging, visionipc, g
 
 camera_obj = env.Object(['cameras/camera_qcom2.cc', 'cameras/camera_common.cc', 'cameras/remote_camera.cc', 'cameras/camera_util.cc',
                          'sensors/ar0231.cc', 'sensors/ox03c10.cc', 'sensors/os04c10.cc'])
-env.Program('camerad', ['main.cc', camera_obj], LIBS=libs)
+
+env.Append(CPPPATH=['/data/zlib-1.3.1/install/include'])
+env.Append(LIBPATH=['/data/zlib-1.3.1/install/lib'])
+
+env.Program('camerad', ['main.cc', camera_obj], LIBS=libs + ['z'])
 
 if GetOption("extras") and arch == "x86_64":
   env.Program('test/test_ae_gray', ['test/test_ae_gray.cc', camera_obj], LIBS=libs)
