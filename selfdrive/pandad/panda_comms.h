@@ -155,6 +155,7 @@ private:
   uint16_t canfd[4] = {0, 0, 0, 0};
   uint32_t uptime = 0;
   bool ignited = 0;
+  bool drone = 0;
   float min_height = 0.8;
   float base_height = 0.0;
   float height_error_acc = 0.0;

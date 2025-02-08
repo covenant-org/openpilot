@@ -9,6 +9,9 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <string>
+#include "zlib.h"
+
+#define ZLCHUNK 16384
 
 extern ExitHandler do_exit;
 
@@ -29,6 +32,53 @@ RemoteCamera::~RemoteCamera() {
   }
 }
 
+int inf(int input_fd, unsigned char *output){
+  int ret;
+  unsigned output_offset = 0;
+  z_stream strm;
+  unsigned char in[ZLCHUNK];
+
+  strm.zalloc = Z_NULL;
+  strm.zfree = Z_NULL;
+  strm.opaque = Z_NULL;
+  strm.avail_in = 0;
+  strm.next_in = Z_NULL;
+  ret = inflateInit(&strm);
+  if(ret != Z_OK){
+    return -1;
+  }
+  do {
+    size_t bytes_read = read(input_fd, in, ZLCHUNK);
+    if(bytes_read<0){
+      (void)inflateEnd(&strm);
+      return -1;
+    }
+    if(bytes_read == 0){
+      break;
+    }
+    strm.next_in = in;
+    strm.avail_in = bytes_read;
+    do{
+      strm.avail_out = ZLCHUNK;
+      strm.next_out = output + output_offset;
+      ret = inflate(&strm, Z_NO_FLUSH);
+      assert(ret!=Z_STREAM_ERROR);
+      switch(ret){
+        case Z_NEED_DICT:
+          ret = Z_DATA_ERROR;
+        case Z_DATA_ERROR:
+        case Z_MEM_ERROR:
+          (void)inflateEnd(&strm);
+          return -1;
+      }
+      output_offset += ZLCHUNK - strm.avail_out;
+    }while(strm.avail_out==0);
+  }while(ret!=Z_STREAM_END);
+
+  (void)inflateEnd(&strm);
+  return ret == Z_STREAM_END ? output_offset : -1;
+}
+
 void RemoteCamera::fetch_frame() {
   LOGW("Attempting to fetch frame");
   int sfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -42,8 +92,14 @@ void RemoteCamera::fetch_frame() {
   send(sfd, sendbuf, 1, 0);
   LOGW("Connected to remote");
   assert(ret == 0);
-  capnp::PackedFdMessageReader message(sfd);
+  std::string package(10*1024*1024, 0);
+  int read = inf(sfd, (unsigned char *)package.data());
+  assert(read >= 0);
+  LOGW("Read and inflated");
+  kj::ArrayInputStream input(kj::ArrayPtr<kj::byte>((unsigned char*) package.data(), read));
+  capnp::PackedMessageReader message(input);
   cereal::Thumbnail::Reader frame = message.getRoot<cereal::Thumbnail>();
+  LOGW("Deserialized");
   auto size = frame.getThumbnail().size();
   LOGW("Got frame %lu bytes", size);
   memcpy(this->last_frame.data(), frame.getThumbnail().begin(), size);

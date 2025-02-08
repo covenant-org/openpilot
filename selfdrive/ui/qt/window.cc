@@ -63,10 +63,10 @@ MainWindow::MainWindow(QWidget *parent) : QWidget(parent) {
   QObject::connect(settingsWindow, &SettingsWindow::showDriverView,
                    [=] { homeWindow->showDriverView(true); });
 
-  screenshotTimer = new QTimer(this);
-  QObject::connect(screenshotTimer, &QTimer::timeout, this,
-                   &MainWindow::takeScreenshot);
-  screenshotTimer->start(300);
+//  screenshotTimer = new QTimer(this);
+//  QObject::connect(screenshotTimer, &QTimer::timeout, this,
+//                   &MainWindow::takeScreenshot);
+//  screenshotTimer->start(300);
 
   onboardingWindow = new OnboardingWindow(this);
   main_layout->addWidget(onboardingWindow);
