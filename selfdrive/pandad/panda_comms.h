@@ -177,6 +177,7 @@ private:
   bool should_start_offboard = true;
 
   bool connect_autopilot();
+  std::unique_ptr<PandaCommsHandle> real_handle;
 };
 
 namespace PandaEndpoints {
