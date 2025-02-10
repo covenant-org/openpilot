@@ -170,6 +170,7 @@ export function start(pc, dc) {
 
   const textDecoder = new TextDecoder();
   var carStaterIndex = 0;
+  var modelMsgIndex = 0;
   dc.onmessage = function(evt) {
     const text = textDecoder.decode(evt.data);
     const msg = JSON.parse(text);
@@ -182,6 +183,10 @@ export function start(pc, dc) {
       }
       chartBattery.update();
     }
+    if(modelMsgIndex % 100 == 0 && msg.type == 'modelV2'){
+      console.log(msg);
+    }
+    modelMsgIndex += 1;
     carStaterIndex += 1;
     lastChannelMessageTime = new Date().getTime();
     $(".pre-blob").addClass('blob');
