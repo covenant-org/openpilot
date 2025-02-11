@@ -143,7 +143,7 @@ public:
 private:
   uint16_t safety_model = 32;
   uint16_t alternative_experience = 1;
-  uint16_t fan_speed = 0;
+//  uint16_t fan_speed = 0;
   uint16_t ir_pwr = 0;
   uint16_t loopback = 0;
   uint32_t ecu_add = 0x722;

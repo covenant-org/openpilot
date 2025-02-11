@@ -362,15 +362,16 @@ PandaMavlinkHandle::PandaMavlinkHandle(std::string serial)
 #else
     throw e;
 #endif
-    this->hw_serial = serial;
-    if (!this->connect_autopilot()) {
-      // throw std::runtime_error("Failed to connect to autopilot");
-      this->ignited = true;
-      this->drone = false;
-    } else {
-      this->drone = true;
-    }
-    this->min_height = std::stof(util::getenv("DRONE_HEIGHT", "1.0"));
+   }
+   this->hw_serial = serial;
+   if (!this->connect_autopilot()) {
+     // throw std::runtime_error("Failed to connect to autopilot");
+     this->ignited = true;
+     this->drone = false;
+   } else {
+     this->drone = true;
+   }
+   this->min_height = std::stof(util::getenv("DRONE_HEIGHT", "1.0"));
   }
 
   PandaMavlinkHandle::~PandaMavlinkHandle() { this->connected = false; }
