@@ -16,7 +16,10 @@
     <div id="main">
       <p class="jumbo">comma body</p>
       <audio id="audio" autoplay="true"></audio>
-      <video id="video" playsinline autoplay muted loop poster="/static/poster.png"></video>
+      <div style="position: relative;">
+          <video id="video" playsinline autoplay muted loop poster="/static/poster.png"></video>
+          <canvas width="2160" height="1080" id="canvas" style="width: 100%; height: 100%; position: absolute; background-color: transparent;"></canvas>
+      </div>
       <div id="icon-panel" class="row">
         <div class="col-sm-12 col-md-6 details">
           <div class="icon-sup-panel col-12">
