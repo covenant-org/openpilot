@@ -118,8 +118,9 @@ void RemoteCamera::init() {
   assert(this->vipc_server != nullptr);
   this->vipc_server->create_buffers(VisionStreamType::VISION_STREAM_ROAD, 5,
                                     false, this->width, this->height);
-  this->vipc_server->start_listener();
-  this->pm = new PubMaster({"roadCameraState"});
+  this->vipc_server->create_buffers(VisionStreamType::VISION_STREAM_WIDE_ROAD, 5,
+                                    false, this->width, this->height);
+  this->pm = new PubMaster({"roadCameraState", "wideRoadCameraState"});
 }
 
 void RemoteCamera::run() {
@@ -130,10 +131,15 @@ void RemoteCamera::run() {
       sleep(1);
       continue;
     }
-    auto buf =
+    auto roadBuf =
         this->vipc_server->get_buffer(VisionStreamType::VISION_STREAM_ROAD);
+    auto wideRoadBuf =
+        this->vipc_server->get_buffer(VisionStreamType::VISION_STREAM_WIDE_ROAD);
     clFinish(queue);
-    clEnqueueWriteBuffer(queue, buf->buf_cl, CL_TRUE, 0,
+    clEnqueueWriteBuffer(queue, roadBuf->buf_cl, CL_TRUE, 0,
+                         this->last_frame.size(),
+                         (void *)this->last_frame.data(), 0, NULL, NULL);
+    clEnqueueWriteBuffer(queue, wideRoadBuf->buf_cl, CL_TRUE, 0,
                          this->last_frame.size(),
                          (void *)this->last_frame.data(), 0, NULL, NULL);
     uint64_t eof = static_cast<uint64_t>(this->frame_id * 0.05 * 1e9);
@@ -142,16 +148,24 @@ void RemoteCamera::run() {
         eof,
         eof,
     };
-    buf->set_frame_id(this->frame_id);
-    this->vipc_server->send(buf, &extra);
+    roadBuf->set_frame_id(this->frame_id);
+    wideRoadBuf->set_frame_id(this->frame_id);
+    this->vipc_server->send(roadBuf, &extra);
+    this->vipc_server->send(wideRoadBuf, &extra);
 
     MessageBuilder msg;
-    auto framed = msg.initEvent().initRoadCameraState();
-    framed.setFrameId(this->frame_id);
-    framed.setTimestampEof(eof);
+    auto roadState = msg.initEvent().initRoadCameraState();
+    roadState.setFrameId(this->frame_id);
+    roadState.setTimestampEof(eof);
     framed.setSensor(cereal::FrameData::ImageSensor::OX03C10);
-
     this->pm->send("roadCameraState", msg);
+
+    auto wideRoadState = msg.initEvent().initWideRoadCameraState();
+    wideRoadState.setFrameId(this->frame_id);
+    wideRoadState.setTimestampEof(eof);
+    wideRoadState.setSensor(cereal::FrameData::ImageSensor::OX03C10);
+    this->pm->send("wideRoadCameraState", msg);
+
     this->frame_id++;
     usleep(50000);
   }
