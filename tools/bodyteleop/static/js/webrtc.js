@@ -186,7 +186,8 @@ export function start(pc, dc) {
   var carStaterIndex = 0;
   var modelMsgIndex = 0;
   dc.onmessage = function(evt) {
-    const text = textDecoder.decode(evt.data);
+    let text = textDecoder.decode(evt.data);
+    text = text.replaceAll("NaN", "null");
     const msg = JSON.parse(text);
     if (carStaterIndex % 100 == 0 && msg.type === 'carState') {
       const batteryLevel = Math.round(msg.data.fuelGauge * 100);
