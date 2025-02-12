@@ -655,12 +655,7 @@ PandaMavlinkHandle::PandaMavlinkHandle(std::string serial)
     uint32_t size = (uint32_t)length;
     unpack_can_buffer(data, size, output);
     for (const can_frame &frame : output) {
-      printf("Address %02lx: ", frame.address);
       if (frame.address == 0x265) {
-        for (int i = 0; i < frame.dat.size(); i++) {
-          printf("%02x ", frame.dat[i]);
-        }
-        printf("\n");
         int16_t angle = frame.dat[0] << 8 | frame.dat[1];
         int16_t speed = frame.dat[2] << 8 | frame.dat[3];
         int16_t down = frame.dat[4] << 8 | frame.dat[5];
@@ -749,7 +744,6 @@ PandaMavlinkHandle::PandaMavlinkHandle(std::string serial)
         }
         this->msg_cv.notify_one();
       }
-      printf("\n");
     }
     return length;
   }
