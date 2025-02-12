@@ -27,7 +27,7 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.realtime import config_realtime_process, DT_MDL
-from openpilot.common.transformations.camera import DEVICE_CAMERAS
+from openpilot.common.transformations.camera import DEVICE_CAMERAS, CameraConfig
 from openpilot.common.transformations.model import get_warp_matrix
 from openpilot.system import sentry
 from openpilot.selfdrive.controls.lib.desire_helper import DesireHelper
@@ -304,8 +304,14 @@ def main(demo=False):
     if sm.updated["liveCalibration"] and sm.seen['roadCameraState'] and sm.seen['deviceState']:
       device_from_calib_euler = np.array(sm["liveCalibration"].rpyCalib, dtype=np.float32)
       dc = DEVICE_CAMERAS[(str(sm['deviceState'].deviceType), str(sm['roadCameraState'].sensor))]
-      model_transform_main = get_warp_matrix(device_from_calib_euler, dc.ecam.intrinsics if main_wide_camera else dc.fcam.intrinsics, False).astype(np.float32)
-      model_transform_extra = get_warp_matrix(device_from_calib_euler, dc.ecam.intrinsics, True).astype(np.float32)
+      ecam = dc.ecam
+      fcam = dc.fcam
+      using_remote_camera = len(os.getenv("REMOTE_CAMERA", "")) > 0
+      if using_remote_camera:
+        device_from_calib_euler = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+        fcam = ecam = CameraConfig(1280, 720, 2648.0)
+      model_transform_main = get_warp_matrix(device_from_calib_euler, ecam.intrinsics if main_wide_camera else fcam.intrinsics, False).astype(np.float32)
+      model_transform_extra = get_warp_matrix(device_from_calib_euler, ecam.intrinsics, True).astype(np.float32)
       live_calib_seen = True
 
     traffic_convention = np.zeros(2)

@@ -80,7 +80,6 @@ int inf(int input_fd, unsigned char *output){
 }
 
 void RemoteCamera::fetch_frame() {
-  LOGW("Attempting to fetch frame");
   int sfd = socket(AF_INET, SOCK_STREAM, 0);
   assert(sfd >= 0);
   sockaddr_in server_addr = {
@@ -90,22 +89,18 @@ void RemoteCamera::fetch_frame() {
   int ret = connect(sfd, (sockaddr *)&server_addr, sizeof(server_addr));
   char sendbuf[1] = {0};
   send(sfd, sendbuf, 1, 0);
-  LOGW("Connected to remote");
   assert(ret == 0);
   std::string package(10*1024*1024, 0);
   int read = inf(sfd, (unsigned char *)package.data());
   assert(read >= 0);
-  LOGW("Read and inflated");
   kj::ArrayInputStream input(kj::ArrayPtr<kj::byte>((unsigned char*) package.data(), read));
   capnp::PackedMessageReader message(input);
   cereal::Thumbnail::Reader frame = message.getRoot<cereal::Thumbnail>();
-  LOGW("Deserialized");
   auto size = frame.getThumbnail().size();
-  LOGW("Got frame %lu bytes", size);
+  this->last_frame.resize(size);
   memcpy(this->last_frame.data(), frame.getThumbnail().begin(), size);
   close(sfd);
   this->recv_frame = true;
-  LOGW("Saved frame");
 };
 
 void RemoteCamera::fetch_frame_thread() {
@@ -119,8 +114,9 @@ void RemoteCamera::init() {
   this->vipc_server->create_buffers(VisionStreamType::VISION_STREAM_ROAD, 5,
                                     false, this->width, this->height);
   this->vipc_server->create_buffers(VisionStreamType::VISION_STREAM_WIDE_ROAD, 5,
-                                    false, this->width, this->height);
-  this->pm = new PubMaster({"roadCameraState", "wideRoadCameraState"});
+                                  false, this->width, this->height);
+  this->vipc_server->start_listener();
+  this->pm = new PubMaster({"roadCameraState","wideRoadCameraState"});
 }
 
 void RemoteCamera::run() {
@@ -140,31 +136,38 @@ void RemoteCamera::run() {
                          this->last_frame.size(),
                          (void *)this->last_frame.data(), 0, NULL, NULL);
     clEnqueueWriteBuffer(queue, wideRoadBuf->buf_cl, CL_TRUE, 0,
-                         this->last_frame.size(),
-                         (void *)this->last_frame.data(), 0, NULL, NULL);
+                        this->last_frame.size(),
+                        (void *)this->last_frame.data(), 0, NULL, NULL);
     uint64_t eof = static_cast<uint64_t>(this->frame_id * 0.05 * 1e9);
-    VisionIpcBufExtra extra = {
+    VisionIpcBufExtra roadExtra = {
         this->frame_id,
         eof,
         eof,
     };
     roadBuf->set_frame_id(this->frame_id);
-    wideRoadBuf->set_frame_id(this->frame_id);
-    this->vipc_server->send(roadBuf, &extra);
-    this->vipc_server->send(wideRoadBuf, &extra);
+    this->vipc_server->send(roadBuf, &roadExtra);
 
-    MessageBuilder msg;
-    auto roadState = msg.initEvent().initRoadCameraState();
+    VisionIpcBufExtra wideRoadExtra = {
+        this->frame_id,
+        eof,
+        eof,
+    };
+    wideRoadBuf->set_frame_id(this->frame_id);
+    this->vipc_server->send(wideRoadBuf, &wideRoadExtra);
+
+    MessageBuilder msgRoad;
+    auto roadState = msgRoad.initEvent().initRoadCameraState();
     roadState.setFrameId(this->frame_id);
     roadState.setTimestampEof(eof);
-    framed.setSensor(cereal::FrameData::ImageSensor::OX03C10);
-    this->pm->send("roadCameraState", msg);
+    roadState.setSensor(cereal::FrameData::ImageSensor::OX03C10);
+    this->pm->send("roadCameraState", msgRoad);
 
-    auto wideRoadState = msg.initEvent().initWideRoadCameraState();
+    MessageBuilder msgWideRoad;
+    auto wideRoadState = msgWideRoad.initEvent().initWideRoadCameraState();
     wideRoadState.setFrameId(this->frame_id);
     wideRoadState.setTimestampEof(eof);
     wideRoadState.setSensor(cereal::FrameData::ImageSensor::OX03C10);
-    this->pm->send("wideRoadCameraState", msg);
+    this->pm->send("wideRoadCameraState", msgWideRoad);
 
     this->frame_id++;
     usleep(50000);
@@ -173,7 +176,6 @@ void RemoteCamera::run() {
 };
 
 void remote_camerad_thread(std::string ip) {
-  LOGW("Running remote camera thread\n");
   cl_device_id device_id = cl_get_device_id(CL_DEVICE_TYPE_DEFAULT);
 #ifdef QCOM2
   const cl_context_properties props[] = {CL_CONTEXT_PRIORITY_HINT_QCOM,

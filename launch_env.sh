@@ -11,4 +11,4 @@ if [ -z "$AGNOS_VERSION" ]; then
 fi
 
 export STAGING_ROOT="/data/safe_staging"
-export LD_LIBRARY_PATH="/data/MAVSDK/install/lib:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="/data/MAVSDK/install/lib:/data/zlib-1.3.1/install/lib:$LD_LIBRARY_PATH"
