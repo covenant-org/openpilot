@@ -142,6 +142,20 @@ export function start(pc, dc) {
     clearInterval(latencyInterval);
   };
 
+  function dotProduct(a, b){
+      const result = Array.from({length: a.length}, () => Array.from({length: b[0].length}, () => 0));
+      for(let row=0; row<a.length; row++){
+          for(let col=0; col<b[0].length; col++){
+              let cell_total = 0;
+              for(let inner_row=0; inner_row<b.length; inner_row++){
+                cell_total += a[row][inner_row] * b[inner_row][col];
+              }
+              result[row][col] = cell_total;
+          }
+      }
+      return result;
+  }
+
   function sendJoystickOverDataChannel() {
     const {x, y} = getXY();
     var message = JSON.stringify({type: "testJoystick", data: {axes: [x, y], buttons: [false]}})
@@ -170,8 +184,10 @@ export function start(pc, dc) {
 
   const textDecoder = new TextDecoder();
   var carStaterIndex = 0;
+  var modelMsgIndex = 0;
   dc.onmessage = function(evt) {
-    const text = textDecoder.decode(evt.data);
+    let text = textDecoder.decode(evt.data);
+    text = text.replaceAll("NaN", "null");
     const msg = JSON.parse(text);
     if (carStaterIndex % 100 == 0 && msg.type === 'carState') {
       const batteryLevel = Math.round(msg.data.fuelGauge * 100);
@@ -182,6 +198,54 @@ export function start(pc, dc) {
       }
       chartBattery.update();
     }
+    if(modelMsgIndex % 5 == 0 && msg.type == 'modelV2'){
+    const calibration = [
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [1.0, 0.0, 0.0]
+    ]
+    const intrinsics = [
+        [2648.0, 0.0, 1928.0 / 2],
+        [0.0, 2648.0, 1208.0 / 2],
+        [0.0, 0.0, 1.0]
+    ]
+       const xList = msg.data.position.x;
+       const yList = msg.data.position.y;
+       const zList = msg.data.position.z;
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, 2160, 1080);
+        for (let i = 0; i<xList.length; i++){
+            let point = [
+                [xList[i]],
+                [yList[i] + 0.9],
+                [zList[i] + 1.22],
+            ];
+            let translated = dotProduct(calibration, point);
+            translated = dotProduct(intrinsics, translated);
+            let dot2d = [
+                translated[0][0] / translated[2][0],
+                translated[1][0] / translated[2][0]
+            ];
+            ctx.fillStyle = "green";
+            ctx.fillRect(dot2d[0], dot2d[1], 10, 10);
+
+            point = [
+                [xList[i]],
+                [yList[i] - 0.9],
+                [zList[i] + 1.22],
+            ];
+            translated = dotProduct(calibration, point);
+            translated = dotProduct(intrinsics, translated);
+            dot2d = [
+                translated[0][0] / translated[2][0],
+                translated[1][0] / translated[2][0]
+            ];
+            ctx.fillStyle = "green";
+            ctx.fillRect(dot2d[0], dot2d[1], 10, 10);
+        }
+    }
+    modelMsgIndex += 1;
     carStaterIndex += 1;
     lastChannelMessageTime = new Date().getTime();
     $(".pre-blob").addClass('blob');

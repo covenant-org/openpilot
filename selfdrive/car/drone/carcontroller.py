@@ -33,7 +33,7 @@ class CarController(CarControllerBase):
     turn_degrees = math.degrees(turn)
 
     can_sends = []
-    print(CC.actuators)
+    #print(CC.actuators)
     # TODO:proper altitude param in car state
     altitude = CS.out.wheelSpeeds.rl
     altitude_error = DESIRED_ALTITUDE - altitude
