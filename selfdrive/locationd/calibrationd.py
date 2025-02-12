@@ -241,12 +241,15 @@ class Calibrator:
     liveCalibration.wideFromDeviceEuler = self.wide_from_device_euler.tolist()
     liveCalibration.height = self.height.tolist()
 
+"""
+    Lest try the real calibration even in no car devices
     if self.not_car:
       liveCalibration.validBlocks = INPUTS_NEEDED
       liveCalibration.calStatus = log.LiveCalibrationData.Status.calibrated
       liveCalibration.calPerc = 100.
       liveCalibration.rpyCalib = [0, 0, 0]
       liveCalibration.rpyCalibSpread = self.calib_spread.tolist()
+"""
 
     return msg
 

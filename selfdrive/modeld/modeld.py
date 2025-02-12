@@ -308,7 +308,7 @@ def main(demo=False):
       fcam = dc.fcam
       using_remote_camera = len(os.getenv("REMOTE_CAMERA", "")) > 0
       if using_remote_camera:
-        device_from_calib_euler = np.array([0.0, 0.0, 0.0], dtype=np.float32)
+          #     device_from_calib_euler = np.array([0.0, 0.0, 0.0], dtype=np.float32)
         fcam = ecam = CameraConfig(1280, 720, 2648.0)
       model_transform_main = get_warp_matrix(device_from_calib_euler, ecam.intrinsics if main_wide_camera else fcam.intrinsics, False).astype(np.float32)
       model_transform_extra = get_warp_matrix(device_from_calib_euler, ecam.intrinsics, True).astype(np.float32)
