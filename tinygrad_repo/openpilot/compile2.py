@@ -9,6 +9,7 @@ if "OPT" not in os.environ: os.environ["OPT"] = "99"
 os.environ["PREREALIZE"] = "0"
 
 OPENPILOT_MODEL = "https://github.com/commaai/openpilot/raw/v0.9.4/selfdrive/modeld/models/supercombo.onnx"
+NUCLEA_MODEL = "https://github.com/covenant-org/tinygrad/releases/download/yoloV8-Medium-NucleaV9/best.onnx"
 
 import onnx
 from typing import Tuple, List
@@ -129,7 +130,7 @@ def thneed_test_onnx(onnx_data, output_fn):
     print("thneed self-test passed!")
 
 if __name__ == "__main__":
-  onnx_data = fetch(sys.argv[1] if len(sys.argv) > 1 else OPENPILOT_MODEL)
+  onnx_data = fetch(sys.argv[1] if len(sys.argv) > 1 else NUCLEA_MODEL)
 
   # quick test for ONNX issues
   #thneed_test_onnx(onnx_data, None)
