@@ -19,6 +19,7 @@
 #include <mavsdk/plugins/action/action.h>
 #include <mavsdk/plugins/offboard/offboard.h>
 #include <mavsdk/plugins/telemetry/telemetry.h>
+#include "cereal/messaging/messaging.h"
 
 #define TIMEOUT 0
 #define SPI_BUF_SIZE 2048
@@ -143,7 +144,6 @@ public:
 private:
   uint16_t safety_model = 32;
   uint16_t alternative_experience = 1;
-//  uint16_t fan_speed = 0;
   uint16_t ir_pwr = 0;
   uint16_t loopback = 0;
   uint32_t ecu_add = 0x722;
@@ -177,7 +177,11 @@ private:
   bool should_start_offboard = true;
 
   bool connect_autopilot();
+  void update_sockets();
+  std::thread update_thread;
   std::unique_ptr<PandaCommsHandle> real_handle;
+
+  std::unique_ptr<SubMaster> sm;
 };
 
 namespace PandaEndpoints {
