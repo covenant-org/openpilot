@@ -248,7 +248,8 @@ class Controls:
 
     # Handle calibration status
     cal_status = self.sm['liveCalibration'].calStatus
-    print(f"{cal_status=}")
+    if cal_status != log.LiveCalibrationData.Status.calibrated:
+      print(f"{cal_status=}")
     """
     if cal_status != log.LiveCalibrationData.Status.calibrated:
       if cal_status == log.LiveCalibrationData.Status.uncalibrated:
