@@ -14,6 +14,9 @@ class CarState(CarStateBase):
 
     #TODO: add altitude to car state for drone
     ret.wheelSpeeds.rl = cp.vl['DRONE_DATA']['ALTITUDE']
+    #TODO: add height target to car state for drone
+    ret.wheelSpeeds.rr = cp.vl['DRONE_DATA']['HEIGHT_TARGET']
+    print(f"height target: {ret.wheelSpeeds.rr}")
 #
     ret.vEgo, ret.aEgo = self.update_speed_kf(ret.vEgoRaw)
     ret.standstill = False

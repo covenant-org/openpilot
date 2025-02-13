@@ -8,12 +8,12 @@ from openpilot.selfdrive.car.interfaces import CarControllerBase
 from openpilot.selfdrive.controls.lib.pid import PIDController
 
 MAX_ANGLE=math.radians(45)
-DESIRED_ALTITUDE=float(os.getenv("DRONE_HEIGHT", 1.0))
 
 class CarController(CarControllerBase):
   def __init__(self, dbc_name, CP, VM):
     self.frame = 0
     self.packer = CANPacker(dbc_name)
+    self.height_target = float(os.getenv("DRONE_HEIGHT", 1.0))
     self.altitude_pid = PIDController(0.65, k_i=0.55, rate=1/DT_CTRL)
 
   def update(self, CC, CS, now_nanos):
@@ -36,7 +36,11 @@ class CarController(CarControllerBase):
     #print(CC.actuators)
     # TODO:proper altitude param in car state
     altitude = CS.out.wheelSpeeds.rl
-    altitude_error = DESIRED_ALTITUDE - altitude
+    target = CS.out.wheelSpeeds.rr
+    if target != self.height_target:
+      self.altitude_pid.reset()
+    self.height_target = target
+    altitude_error = self.height_target - altitude
     down_ms = self.altitude_pid.update(altitude_error, freeze_integrator=False)
     can_sends.append(bodycan.create_control(self.packer, turn_degrees, desired_speed, down_ms))
 
