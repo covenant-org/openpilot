@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <errno.h>
 #include <mavsdk/mavsdk.h>
 #include <mavsdk/plugins/telemetry/telemetry.h>
 #include <mavsdk/system.h>
@@ -18,6 +19,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <sys/stat.h>
 #include <tuple>
 #include <unistd.h>
 
@@ -321,24 +323,17 @@ bool PandaMavlinkHandle::connect_autopilot() {
   this->mavsdk_telemetry_plugin->subscribe_position(
       [&](mavsdk::Telemetry::Position position) {
         this->mavsdk_telemetry_messages.position = position;
-        if (!this->ignited) {
-          this->height_error_acc += position.relative_altitude_m;
-          this->height_msgs_count++;
-          this->base_height = this->height_error_acc / this->height_msgs_count;
-        }
       });
   this->mavsdk_telemetry_plugin->subscribe_armed([&](bool armed) {
     // Falling edge
     if (this->ignited && !armed) {
-      this->base_height = 0;
-      this->height_error_acc = 0;
-      this->height_msgs_count = 0;
+      this->reset_state();
     }
     this->ignited = armed;
     if (!armed) {
       this->should_start_offboard = true;
     }
-    if (this->should_start_offboard && armed &&
+    if (!this->manual_control && this->should_start_offboard && armed &&
         this->mavsdk_telemetry_messages.position.relative_altitude_m <= 1.0) {
       this->mavsdk_action_plugin->set_takeoff_altitude(this->min_height + 0.5);
       this->mavsdk_action_plugin->takeoff_async(
@@ -346,6 +341,13 @@ bool PandaMavlinkHandle::connect_autopilot() {
     }
   });
   return true;
+}
+
+void PandaMavlinkHandle::reset_state() {
+  this->should_start_offboard = true;
+  this->manual_control = util::getenv("MANUAL_CONTROL", "").compare("1") == 0;
+  this->min_height = std::stof(util::getenv("DRONE_HEIGHT", "1.0"));
+  this->allow_offboard_commands = !this->manual_control;
 }
 
 PandaMavlinkHandle::PandaMavlinkHandle(std::string serial)
@@ -374,11 +376,59 @@ PandaMavlinkHandle::PandaMavlinkHandle(std::string serial)
   } else {
     this->drone = true;
   }
-  this->min_height = std::stof(util::getenv("DRONE_HEIGHT", "1.0"));
+  this->create_pipe();
+  this->reset_state();
   this->update_thread = std::thread(&PandaMavlinkHandle::update_sockets, this);
+  this->read_thread = std::thread(&PandaMavlinkHandle::read_pipe, this);
 }
 
-PandaMavlinkHandle::~PandaMavlinkHandle() { this->connected = false; }
+void PandaMavlinkHandle::create_pipe() {
+  stat sb;
+  int ret = lstat("/data/panda.pipe", &sb);
+  if (ret < 0) {
+    assert(errno == ENOENT);
+    assert(mkfifo("/data/panda.pipe", 0666) == 0);
+    return;
+  }
+  assert((sb.st_mode & S_IFMT) == S_IFIFO);
+  this->pipe_fd = open("/data/panda.pipe", O_RDONLY);
+  assert(this->pipe_fd >= 0);
+}
+
+void PandaMavlinkHandle::read_pipe() {
+  char command;
+  while (true) {
+    int ret = read(this->pipe_fd, &command, 1);
+    if (ret < 0) {
+      return;
+    }
+    switch (command) {
+    case 'o': {
+      if (this->manual_control) {
+        // Allow wiggle room
+        this->min_height =
+            this->mavsdk_telemetry_messages.position.relative_altitude_m - 0.2;
+      }
+      this->should_start_offboard = true;
+      this->allow_offboard_commands = true;
+      break;
+    }
+    case 'm': {
+      this->should_start_offboard = false;
+      this->allow_offboard_commands = false;
+      this->mavsdk_offboard_plugin->stop();
+      break;
+    }
+    }
+  }
+}
+
+PandaMavlinkHandle::~PandaMavlinkHandle() {
+  this->connected = false;
+  if (this->pipe_fd >= 0) {
+    close(this->pipe_fd);
+  }
+}
 
 void PandaMavlinkHandle::update_sockets() {
   while (true) {
@@ -670,12 +720,13 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
       int16_t speed = frame.dat[2] << 8 | frame.dat[3];
       int16_t down = frame.dat[4] << 8 | frame.dat[5];
       printf("angle %d, speed %d, down %d\n", angle, speed, down);
-      if (!this->drone)
+      if (!this->drone || !this->allow_offboard_commands) {
+        this->should_start_offboard = false;
         continue;
-      float corrected_height =
-          this->mavsdk_telemetry_messages.position.relative_altitude_m -
-          this->base_height;
-      if (corrected_height >= this->min_height &&
+      }
+      float height =
+          this->mavsdk_telemetry_messages.position.relative_altitude_m;
+      if (height >= this->min_height &&
           !this->mavsdk_offboard_plugin->is_active() &&
           this->should_start_offboard) {
         mavsdk::Offboard::VelocityBodyYawspeed stay{};

@@ -157,10 +157,9 @@ private:
   uint32_t uptime = 0;
   bool ignited = 0;
   bool drone = 0;
+  bool manual_control = false;
+  bool allow_offboard_commands = true;
   float min_height = 0.8;
-  float base_height = 0.0;
-  float height_error_acc = 0.0;
-  uint height_msgs_count = 0;
   std::string mavlink_uri = "serial:///dev/ttyACM0:57600";
   std::string vin = "JH4DB1542MS007683";
   std::string fw_version = "ncl.0.01";
@@ -179,8 +178,14 @@ private:
 
   bool connect_autopilot();
   void update_sockets();
+  void read_pipe();
+  void reset_state();
+  void create_pipe();
   std::thread update_thread;
+  std::thread read_thread;
   std::unique_ptr<PandaCommsHandle> real_handle;
+
+  int pipe_fd = -1;
 
   std::unique_ptr<SubMaster> sm;
 };
