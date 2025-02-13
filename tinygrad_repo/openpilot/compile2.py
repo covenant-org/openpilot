@@ -2,10 +2,11 @@
 import os, sys, io, pathlib
 import cv2
 import numpy as np
+from pathlib import Path
 sys.path.insert(0, str(pathlib.Path(__file__).parents[1]))
 
-if "FLOAT16" not in os.environ: os.environ["FLOAT16"] = "1"
-if "IMAGE" not in os.environ: os.environ["IMAGE"] = "2"
+if "FLOAT16" not in os.environ: os.environ["FLOAT16"] = "0"
+if "IMAGE" not in os.environ: os.environ["IMAGE"] = "0"
 if "NOLOCALS" not in os.environ: os.environ["NOLOCALS"] = "1"
 if "OPT" not in os.environ: os.environ["OPT"] = "99"
 os.environ["PREREALIZE"] = "0"
@@ -35,7 +36,12 @@ def get_schedule(onnx_data) -> Tuple[List[ScheduleItem], List[ScheduleItem]]:
   input_shapes = {inp.name:tuple(x.dim_value for x in inp.type.tensor_type.shape.dim) for inp in onnx_model.graph.input}
 
   # run the model
-  inputs = {k:Tensor.empty(*shp) for k,shp in input_shapes.items()}
+  target_size = tuple(reversed(input_shapes['images'][2:]))
+  gt_path = Path("/data/tinygrad/models/ground-truth")
+  images_sample = sorted([img for ext in ["*.jpg", "*.jpeg", "*.png"] for img in gt_path.glob(ext)])
+  
+  image = cv2.imread(images_sample[1])
+  inputs = preprocess_image(image, target_size)
   ret: Tensor = next(iter(run_onnx(inputs).values())).cast(dtypes.float32).contiguous()
   schedule = ret.lazydata.schedule()
 
@@ -158,8 +164,8 @@ if __name__ == "__main__":
   onnx_data = fetch(sys.argv[1] if len(sys.argv) > 1 else NUCLEA_MODEL)
 
   # quick test for ONNX issues
-  thneed_test_onnx(onnx_data, None)
-  exit(0)
+  # thneed_test_onnx(onnx_data, None)
+  # exit(0)
 
   schedule, schedule_independent, inputs = get_schedule(onnx_data)
   schedule, schedule_input = partition(schedule, lambda x: x.ast.op not in LoadOps)
