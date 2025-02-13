@@ -860,12 +860,12 @@ int PandaMavlinkHandle::bulk_read(unsigned char endpoint, unsigned char *data,
     float altitude =
         this->mavsdk_telemetry_messages.position.relative_altitude_m;
     int16_t altitude_m = static_cast<int16_t>(altitude * 100);
-    int16_t min_height = static_cast<int16_t>(this->min_height * 100);
+    int16_t h_target = static_cast<int16_t>(this->min_height * 100);
     std::string content = {
         (char)((yaw_rate_deg & 0xFF00) >> 8), (char)(yaw_rate_deg & 0xFF),
         (char)((speed_mps & 0xFF00) >> 8),    (char)(speed_mps & 0xFF),
         (char)((altitude_m & 0xFF00) >> 8),   (char)(altitude_m & 0xFF),
-        (char)((min_height & 0xFF00) >> 8),  (char)(min_height & 0xFF),
+        (char)((h_target & 0xFF00) >> 8),  (char)(h_target & 0xFF),
     };
     total_read += pack_can_msg(0, 0x266, content, data + total_read);
   }
