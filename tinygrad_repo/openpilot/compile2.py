@@ -158,8 +158,8 @@ if __name__ == "__main__":
   onnx_data = fetch(sys.argv[1] if len(sys.argv) > 1 else NUCLEA_MODEL)
 
   # quick test for ONNX issues
-  #thneed_test_onnx(onnx_data, None)
-  #exit(0)
+  thneed_test_onnx(onnx_data, None)
+  exit(0)
 
   schedule, schedule_independent, inputs = get_schedule(onnx_data)
   schedule, schedule_input = partition(schedule, lambda x: x.ast.op not in LoadOps)
