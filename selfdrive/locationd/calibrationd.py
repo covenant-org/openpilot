@@ -183,7 +183,6 @@ class Calibrator:
     self.old_rpy_weight = max(0.0, self.old_rpy_weight - 1/SMOOTH_CYCLES)
 
     straight_and_fast = ((self.v_ego > MIN_SPEED_FILTER) and (trans[0] > MIN_SPEED_FILTER) and (abs(rot[2]) < MAX_YAW_RATE_FILTER))
-    print(f"straight and fast {self.v_ego=} {trans[0]=} {rot[0]=}")
     angle_std_threshold = MAX_VEL_ANGLE_STD
     height_std_threshold = MAX_HEIGHT_STD
     rpy_certain = np.arctan2(trans_std[1], trans[0]) < angle_std_threshold
@@ -193,8 +192,9 @@ class Calibrator:
       height_certain = True
 
     certain_if_calib = (rpy_certain and height_certain) or (self.valid_blocks < INPUTS_NEEDED)
-    print(f"{straight_and_fast=} {certain_if_calib=}")
     if not (straight_and_fast and certain_if_calib):
+      if self.cal_status == log.LiveCalibrationData.Status.uncalibrated:
+        print(f"{straight_and_fast=} {certain_if_calib=} {self.v_ego=} {trans[0]=} {rot[0]=}")
       return None
 
     observed_rpy = np.array([0,

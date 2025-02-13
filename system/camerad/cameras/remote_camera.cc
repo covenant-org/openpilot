@@ -106,9 +106,11 @@ void RemoteCamera::fetch_frame() {
   close(sfd);
   this->recv_frame = true;
   this->frame_counter += 1;
-  auto now = std::chrono::system_clock::now();
-  std::chrono::seconds seconds_since_start = std::chrono::duration_cast<std::chrono::seconds>(now-this->start);
-  printf("Frames %d Seconds %ld FPS %ld\n", this->frame_counter, seconds_since_start.count(), this->frame_counter/seconds_since_start.count());
+  if(this->frame_counter%100 == 0){
+    auto now = std::chrono::system_clock::now();
+    std::chrono::seconds seconds_since_start = std::chrono::duration_cast<std::chrono::seconds>(now-this->start);
+    printf("Frames %d Seconds %ld FPS %ld\n", this->frame_counter, seconds_since_start.count(), this->frame_counter/seconds_since_start.count());
+  }
 };
 
 void RemoteCamera::fetch_frame_thread() {
