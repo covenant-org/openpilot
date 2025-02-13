@@ -248,6 +248,8 @@ class Controls:
 
     # Handle calibration status
     cal_status = self.sm['liveCalibration'].calStatus
+    print(f"{cal_status=}")
+    """
     if cal_status != log.LiveCalibrationData.Status.calibrated:
       if cal_status == log.LiveCalibrationData.Status.uncalibrated:
         self.events.add(EventName.calibrationIncomplete)
@@ -258,6 +260,7 @@ class Controls:
         self.events.add(EventName.calibrationRecalibrating)
       else:
         self.events.add(EventName.calibrationInvalid)
+    """
 
     # Handle lane change
     if self.sm['modelV2'].meta.laneChangeState == LaneChangeState.preLaneChange:

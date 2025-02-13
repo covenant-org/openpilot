@@ -380,7 +380,7 @@ PandaMavlinkHandle::PandaMavlinkHandle(std::string serial)
 
 PandaMavlinkHandle::~PandaMavlinkHandle() { this->connected = false; }
 
-PandaMavlinkHandle::update_sockets() {
+void PandaMavlinkHandle::update_sockets() {
   while (true) {
     this->sm->update(0);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -693,14 +693,23 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
       command.down_m_s = down / 100.0;
       command.yawspeed_deg_s = angle / 10.0;
       command.forward_m_s = speed / 100.0;
-      auto cal_status =
-          self.sm['liveCalibration'].getLiveCalibration().getCalStatus();
+      SubMaster &subm = *(this->sm);
+      auto cal_status = subm["liveCalibration"].getLiveCalibration().getCalStatus();
       if (cal_status !=
-          cereal::LiveCalibrationData::CalibrationStatus::CALIBRATED) {
-        command.forward_m_s = 2.0;
+          cereal::LiveCalibrationData::Status::CALIBRATED) {
+        mavsdk::Telemetry::VelocityBody velocity_body{
+            this->mavsdk_telemetry_messages.odometry.velocity_body};
+        float current_speed = std::sqrt(velocity_body.x_m_s * velocity_body.x_m_s +
+                                velocity_body.y_m_s * velocity_body.y_m_s);
+        if(current_speed < 7){
+          current_speed += 0.5;
+        }
+        command.forward_m_s = current_speed;
+      }
+      if (command.forward_m_s > 0 && command.forward_m_s < 1){
+        command.forward_m_s  = 1;
       }
       this->mavsdk_offboard_plugin->set_velocity_body(command);
-    }
   }
   if (frame.address != 0x7DF && frame.address != this->ecu_add) {
     continue;
