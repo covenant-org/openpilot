@@ -23,6 +23,7 @@ RemoteCamera::RemoteCamera(std::string addr, uint16_t port, uint16_t height,
   cl_int err = 0;
   this->queue = clCreateCommandQueueWithProperties(ctx, device_id, 0, &err);
   assert(err == CL_SUCCESS);
+  this->recv_frame = false;
 }
 
 RemoteCamera::~RemoteCamera() {
@@ -80,6 +81,9 @@ int inf(int input_fd, unsigned char *output){
 }
 
 void RemoteCamera::fetch_frame() {
+  if(!this->recv_frame){
+    this->start = std::chrono::system_clock::now();
+  }
   int sfd = socket(AF_INET, SOCK_STREAM, 0);
   assert(sfd >= 0);
   sockaddr_in server_addr = {
@@ -101,6 +105,10 @@ void RemoteCamera::fetch_frame() {
   memcpy(this->last_frame.data(), frame.getThumbnail().begin(), size);
   close(sfd);
   this->recv_frame = true;
+  this->frame_counter += 1;
+  auto now = std::chrono::system_clock::now();
+  std::chrono::seconds seconds_since_start = std::chrono::duration_cast<std::chrono::seconds>(now-this->start);
+  printf("Frames %d Seconds %ld FPS %ld\n", this->frame_counter, seconds_since_start.count(), this->frame_counter/seconds_since_start.count());
 };
 
 void RemoteCamera::fetch_frame_thread() {
@@ -123,10 +131,6 @@ void RemoteCamera::run() {
   this->fetch_thread = std::thread(&RemoteCamera::fetch_frame_thread, this);
   this->init();
   while (!do_exit) {
-    if (!this->recv_frame) {
-      sleep(1);
-      continue;
-    }
     auto roadBuf =
         this->vipc_server->get_buffer(VisionStreamType::VISION_STREAM_ROAD);
     auto wideRoadBuf =
@@ -189,7 +193,7 @@ void remote_camerad_thread(std::string ip) {
   size_t split_port_pos = ip.find(":");
   assert(split_port_pos != std::string::npos);
   VisionIpcServer vipc_server("camerad", device_id, context);
-  RemoteCamera cam(ip.substr(0, split_port_pos), atoi(ip.substr(split_port_pos + 1).c_str()), 720, 1280, context, device_id,
+  RemoteCamera cam(ip.substr(0, split_port_pos), atoi(ip.substr(split_port_pos + 1).c_str()), 360, 640, context, device_id,
                    &vipc_server);
   cam.run();
 };

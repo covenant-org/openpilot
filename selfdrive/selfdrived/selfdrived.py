@@ -213,6 +213,8 @@ class SelfdriveD:
 
     # Handle calibration status
     cal_status = self.sm['liveCalibration'].calStatus
+    print(f"{cal_status=}")
+    """
     if cal_status != log.LiveCalibrationData.Status.calibrated:
       if cal_status == log.LiveCalibrationData.Status.uncalibrated:
         self.events.add(EventName.calibrationIncomplete)
@@ -223,6 +225,7 @@ class SelfdriveD:
         self.events.add(EventName.calibrationRecalibrating)
       else:
         self.events.add(EventName.calibrationInvalid)
+    """
 
     # Lane departure warning
     if self.is_ldw_enabled and self.sm.valid['driverAssistance']:

@@ -8,6 +8,7 @@
 #include <queue>
 #include <string>
 #include <vector>
+#include <thread>
 
 #ifndef __APPLE__
 #include <linux/spi/spidev.h>
