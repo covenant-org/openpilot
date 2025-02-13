@@ -365,6 +365,8 @@ PandaMavlinkHandle::PandaMavlinkHandle(std::string serial)
     throw e;
 #endif
   }
+  this->create_pipe();
+  this->reset_state();
   this->sm =
       std::make_unique<SubMaster, const std::initializer_list<const char *>>(
           {"liveCalibration"});
@@ -376,32 +378,34 @@ PandaMavlinkHandle::PandaMavlinkHandle(std::string serial)
   } else {
     this->drone = true;
   }
-  this->create_pipe();
-  this->reset_state();
   this->update_thread = std::thread(&PandaMavlinkHandle::update_sockets, this);
   this->read_thread = std::thread(&PandaMavlinkHandle::read_pipe, this);
 }
 
 void PandaMavlinkHandle::create_pipe() {
-  stat sb;
+  struct stat sb;
   int ret = lstat("/data/panda.pipe", &sb);
   if (ret < 0) {
     assert(errno == ENOENT);
     assert(mkfifo("/data/panda.pipe", 0666) == 0);
-    return;
+    assert(lstat("/data/panda.pipe", &sb) == 0);
   }
   assert((sb.st_mode & S_IFMT) == S_IFIFO);
-  this->pipe_fd = open("/data/panda.pipe", O_RDONLY);
-  assert(this->pipe_fd >= 0);
 }
 
 void PandaMavlinkHandle::read_pipe() {
   char command;
+  int ret = 0;
   while (true) {
-    int ret = read(this->pipe_fd, &command, 1);
+  this->pipe_fd = open("/data/panda.pipe", O_RDONLY);
+  assert(this->pipe_fd >= 0);
+  LOGW("Open pipe file");
+    ret = read(this->pipe_fd, &command, 1);
     if (ret < 0) {
       return;
     }
+    close(this->pipe_fd);
+  LOGW("Read command");
     switch (command) {
     case 'o': {
       if (this->manual_control) {
@@ -855,7 +859,6 @@ int PandaMavlinkHandle::bulk_read(unsigned char endpoint, unsigned char *data,
     int16_t yaw_rate_deg = static_cast<int16_t>(yaw_rate * 10);
     float altitude =
         this->mavsdk_telemetry_messages.position.relative_altitude_m;
-    altitude -= this->base_height;
     int16_t altitude_m = static_cast<int16_t>(altitude * 100);
     std::string content = {
         (char)((yaw_rate_deg & 0xFF00) >> 8), (char)(yaw_rate_deg & 0xFF),
