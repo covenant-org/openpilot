@@ -96,7 +96,7 @@ def preprocess_image(image, target_size):
     for k, v in new_inputs_numpy.items():
         print(f"{k}: {v.shape}")
 
-    inputs = {k:v.realize().numpy() for k,v in new_inputs_numpy.items()}
+    inputs = {k: Tensor(v).realize().numpy() for k, v in new_inputs_numpy.items()}
     return inputs
 
 def thneed_test_onnx(onnx_data, output_fn):
