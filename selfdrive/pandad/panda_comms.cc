@@ -693,81 +693,88 @@ int PandaMavlinkHandle::bulk_write(unsigned char endpoint, unsigned char *data,
       command.down_m_s = down / 100.0;
       command.yawspeed_deg_s = angle / 10.0;
       command.forward_m_s = speed / 100.0;
+      bool automaticCalibration =
+          util::getenv("AUTOMATIC_CALIBRATION").compare("1") == 0;
       SubMaster &subm = *(this->sm);
-      auto cal_status = subm["liveCalibration"].getLiveCalibration().getCalStatus();
-      if (cal_status !=
-          cereal::LiveCalibrationData::Status::CALIBRATED) {
+      auto cal_status =
+          subm["liveCalibration"].getLiveCalibration().getCalStatus();
+      if (cal_status != cereal::LiveCalibrationData::Status::CALIBRATED &&
+          automaticCalibration) {
         mavsdk::Telemetry::VelocityBody velocity_body{
             this->mavsdk_telemetry_messages.odometry.velocity_body};
-        float current_speed = std::sqrt(velocity_body.x_m_s * velocity_body.x_m_s +
-                                velocity_body.y_m_s * velocity_body.y_m_s);
-        if(current_speed < 7){
+        float current_speed =
+            std::sqrt(velocity_body.x_m_s * velocity_body.x_m_s +
+                      velocity_body.y_m_s * velocity_body.y_m_s);
+        if (current_speed < 7) {
           current_speed += 0.5;
         }
         command.forward_m_s = current_speed;
       }
-      if (command.forward_m_s > 0 && command.forward_m_s < 1){
-        command.forward_m_s  = 1;
+      // TODO: Need to test this one
+      if (command.forward_m_s > 0 && command.forward_m_s < 1) {
+        command.forward_m_s = 1;
       }
       this->mavsdk_offboard_plugin->set_velocity_body(command);
-  }
-  if (frame.address != 0x7DF && frame.address != this->ecu_add) {
-    continue;
-  }
-  std::string frame_dat = frame.dat;
-  char len = frame_dat[0] & 0x0F;
-  if (frame_dat[1] == CANServiceTypes::READ_DATA_BY_IDENTIFIER) {
-    uint32_t identifier = 0;
-    for (size_t i = 2; i < 2 + len - 1; i++) {
-      identifier <<= 8;
-      identifier |= frame_dat[i];
     }
-    if (identifier == CANIdentifiers::VIN) {
-      {
-        std::lock_guard lk(this->msg_lock);
-        std::string response_code = {
-            CANServiceTypes::READ_DATA_BY_IDENTIFIER + 0x40,
-            (char)((CANIdentifiers::VIN & 0xFF00) >> 8),
-            (char)(CANIdentifiers::VIN & 0xFF)};
-        std::vector<std::string> segments;
-        to_isotp_frame(response_code, this->vin, segments);
-        for (const std::string &segment : segments) {
-          this->msg_queue.emplace(std::make_tuple(0, 0x7e0 + 8, segment));
-        }
+    if (frame.address != 0x7DF && frame.address != this->ecu_add) {
+      continue;
+    }
+    std::string frame_dat = frame.dat;
+    char len = frame_dat[0] & 0x0F;
+    if (frame_dat[1] == CANServiceTypes::READ_DATA_BY_IDENTIFIER) {
+      uint32_t identifier = 0;
+      for (size_t i = 2; i < 2 + len - 1; i++) {
+        identifier <<= 8;
+        identifier |= frame_dat[i];
       }
-      this->msg_cv.notify_one();
-    }
+      if (identifier == CANIdentifiers::VIN) {
+        {
+          std::lock_guard lk(this->msg_lock);
+          std::string response_code = {
+              CANServiceTypes::READ_DATA_BY_IDENTIFIER + 0x40,
+              (char)((CANIdentifiers::VIN & 0xFF00) >> 8),
+              (char)(CANIdentifiers::VIN & 0xFF)};
+          std::vector<std::string> segments;
+          to_isotp_frame(response_code, this->vin, segments);
+          for (const std::string &segment : segments) {
+            this->msg_queue.emplace(std::make_tuple(0, 0x7e0 + 8, segment));
+          }
+        }
+        this->msg_cv.notify_one();
+      }
 
-    if (identifier == CANIdentifiers::APPLICATION_SOFTWARE_IDENTIFICATION) {
+      if (identifier == CANIdentifiers::APPLICATION_SOFTWARE_IDENTIFICATION) {
+        {
+          std::lock_guard lk(this->msg_lock);
+          std::string response_code = {
+              CANServiceTypes::READ_DATA_BY_IDENTIFIER + 0x40,
+              (char)((CANIdentifiers::APPLICATION_SOFTWARE_IDENTIFICATION &
+                      0xFF00) >>
+                     8),
+              (char)(CANIdentifiers::APPLICATION_SOFTWARE_IDENTIFICATION &
+                     0xFF)};
+          std::vector<std::string> segments;
+          to_isotp_frame(response_code, this->fw_version, segments);
+          for (const std::string &segment : segments) {
+            this->msg_queue.emplace(
+                std::make_tuple(0, this->ecu_add + 8, segment));
+          }
+        }
+        this->msg_cv.notify_one();
+      }
+    }
+    if (frame_dat[1] == CANServiceTypes::TESTER_PRESENT) {
+      std::string segment = {0x02, CANServiceTypes::TESTER_PRESENT + 0x40,
+                             0x00};
+      segment.resize(CAN_MAX_DATA_SIZE, 0);
       {
         std::lock_guard lk(this->msg_lock);
-        std::string response_code = {
-            CANServiceTypes::READ_DATA_BY_IDENTIFIER + 0x40,
-            (char)((CANIdentifiers::APPLICATION_SOFTWARE_IDENTIFICATION &
-                    0xFF00) >>
-                   8),
-            (char)(CANIdentifiers::APPLICATION_SOFTWARE_IDENTIFICATION & 0xFF)};
-        std::vector<std::string> segments;
-        to_isotp_frame(response_code, this->fw_version, segments);
-        for (const std::string &segment : segments) {
-          this->msg_queue.emplace(
-              std::make_tuple(0, this->ecu_add + 8, segment));
-        }
+        this->msg_queue.emplace(std::make_tuple(0, this->ecu_add + 8, segment));
       }
       this->msg_cv.notify_one();
     }
   }
-  if (frame_dat[1] == CANServiceTypes::TESTER_PRESENT) {
-    std::string segment = {0x02, CANServiceTypes::TESTER_PRESENT + 0x40, 0x00};
-    segment.resize(CAN_MAX_DATA_SIZE, 0);
-    {
-      std::lock_guard lk(this->msg_lock);
-      this->msg_queue.emplace(std::make_tuple(0, this->ecu_add + 8, segment));
-    }
-    this->msg_cv.notify_one();
-  }
-}
-return length;
+  return length;
 }
 
 int PandaMavlinkHandle::bulk_read(unsigned char endpoint, unsigned char *data,
