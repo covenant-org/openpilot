@@ -85,17 +85,16 @@ def schedule_to_thneed(schedule, output_fn):
   runtime = t.run()
   print(f"network using {used_ops/1e9:.2f} GOPS with runtime {runtime*1e3:.2f} ms that's {used_ops/runtime*1e-9:.2f} GFLOPS")
 
-def preprocess_image(self, image):
-    resized_image = cv2.resize(image, self.target_size)
+def preprocess_image(image, target_size):
+    resized_image = cv2.resize(image, target_size)
     normalized_image = resized_image.astype(np.float32) / 255.0
     chw_image = np.transpose(normalized_image, (2, 0, 1))
     batched_image = np.expand_dims(chw_image, axis=0)
 
     new_inputs_numpy = {"images": batched_image}
 
-    if self.debug:
-        for k, v in new_inputs_numpy.items():
-            print(f"{k}: {v.shape}")
+    for k, v in new_inputs_numpy.items():
+        print(f"{k}: {v.shape}")
 
     inputs = {k: Tensor(v, device="NPY").realize() for k, v in new_inputs_numpy.items()}
     return inputs
@@ -110,12 +109,13 @@ def thneed_test_onnx(onnx_data, output_fn):
   onnx_model = onnx.load(io.BytesIO(onnx_data))
 
   input_shapes = {inp.name:tuple(x.dim_value for x in inp.type.tensor_type.shape.dim) for inp in onnx_model.graph.input}
+  target_size = tuple(reversed(input_shapes['images'][2:]))
   
   gt_path = Path("/data/tinygrad/models/ground-truth")
   images_sample = sorted([img for ext in ["*.jpg", "*.jpeg", "*.png"] for img in gt_path.glob(ext)])
   
   image = cv2.imread(images_sample[1])
-  new_np_inputs = preprocess_image(image)
+  new_np_inputs = preprocess_image(image, target_size)
   
   # inputs = {k:Tensor.randn(*shp, requires_grad=False)*8 for k,shp in input_shapes.items()}
   # new_np_inputs = {k:v.realize().numpy() for k,v in inputs.items()}
