@@ -8,6 +8,7 @@
 #include <queue>
 #include <string>
 #include <vector>
+#include <thread>
 
 #ifndef __APPLE__
 #include <linux/spi/spidev.h>
@@ -19,6 +20,7 @@
 #include <mavsdk/plugins/action/action.h>
 #include <mavsdk/plugins/offboard/offboard.h>
 #include <mavsdk/plugins/telemetry/telemetry.h>
+#include "cereal/messaging/messaging.h"
 
 #define TIMEOUT 0
 #define SPI_BUF_SIZE 2048
@@ -143,7 +145,6 @@ public:
 private:
   uint16_t safety_model = 32;
   uint16_t alternative_experience = 1;
-//  uint16_t fan_speed = 0;
   uint16_t ir_pwr = 0;
   uint16_t loopback = 0;
   uint32_t ecu_add = 0x722;
@@ -156,10 +157,9 @@ private:
   uint32_t uptime = 0;
   bool ignited = 0;
   bool drone = 0;
+  bool manual_control = false;
+  bool allow_offboard_commands = true;
   float min_height = 0.8;
-  float base_height = 0.0;
-  float height_error_acc = 0.0;
-  uint height_msgs_count = 0;
   std::string mavlink_uri = "serial:///dev/ttyACM0:57600";
   std::string vin = "JH4DB1542MS007683";
   std::string fw_version = "ncl.0.01";
@@ -177,7 +177,17 @@ private:
   bool should_start_offboard = true;
 
   bool connect_autopilot();
+  void update_sockets();
+  void read_pipe();
+  void reset_state();
+  void create_pipe();
+  std::thread update_thread;
+  std::thread read_thread;
   std::unique_ptr<PandaCommsHandle> real_handle;
+
+  int pipe_fd = -1;
+
+  std::unique_ptr<SubMaster> sm;
 };
 
 namespace PandaEndpoints {

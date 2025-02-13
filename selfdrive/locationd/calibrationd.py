@@ -194,6 +194,8 @@ class Calibrator:
 
     certain_if_calib = (rpy_certain and height_certain) or (self.valid_blocks < INPUTS_NEEDED)
     if not (straight_and_fast and certain_if_calib):
+      if self.cal_status == log.LiveCalibrationData.Status.uncalibrated:
+        print(f"{straight_and_fast=} {certain_if_calib=} {self.v_ego=} {trans[0]=} {rot[0]=}")
       return None
 
     observed_rpy = np.array([0,
@@ -242,7 +244,7 @@ class Calibrator:
     liveCalibration.wideFromDeviceEuler = self.wide_from_device_euler.tolist()
     liveCalibration.height = self.height.tolist()
 
-    if self.not_car:
+    if self.not_car and os.getenv("USE_LIVE_CALIBRATION", "") == "1":
       liveCalibration.validBlocks = INPUTS_NEEDED
       liveCalibration.calStatus = log.LiveCalibrationData.Status.calibrated
       liveCalibration.calPerc = 100.

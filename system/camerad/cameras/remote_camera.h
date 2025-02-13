@@ -13,12 +13,15 @@
 #include <capnp/serialize-packed.h>
 #include "common/util.h"
 #include "cereal/messaging/messaging.h"
+#include <chrono>
 
 class RemoteCamera {
 private:
   std::thread fetch_thread;
   std::string last_frame;
   bool recv_frame;
+  uint16_t frame_counter;
+  std::chrono::time_point<std::chrono::system_clock> start;
   std::string ip;
   uint16_t port;
   uint16_t height;
