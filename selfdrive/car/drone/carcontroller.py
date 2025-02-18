@@ -26,7 +26,7 @@ class CarController(CarControllerBase):
       desired_speed = 0
 
     w = 4.5
-    steering_angle = math.radians(CC.actuators.steeringAngleDeg)
+    steering_angle = math.radians(CC.actuators.steeringAngleDeg * 100)
     if(abs(steering_angle) > MAX_ANGLE):
       steering_angle = math.copysign(MAX_ANGLE, steering_angle)
     turn = desired_speed * math.sin(steering_angle) / w
