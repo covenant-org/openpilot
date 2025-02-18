@@ -397,15 +397,15 @@ void PandaMavlinkHandle::read_pipe() {
   char command;
   int ret = 0;
   while (true) {
-  this->pipe_fd = open("/data/panda.pipe", O_RDONLY);
-  assert(this->pipe_fd >= 0);
-  LOGW("Open pipe file");
+    this->pipe_fd = open("/data/panda.pipe", O_RDONLY);
+    assert(this->pipe_fd >= 0);
+    LOGW("Open pipe file");
     ret = read(this->pipe_fd, &command, 1);
     if (ret < 0) {
       return;
     }
     close(this->pipe_fd);
-  LOGW("Read command");
+    LOGW("Read command");
     switch (command) {
     case 'o': {
       if (this->manual_control) {
@@ -865,9 +865,13 @@ int PandaMavlinkHandle::bulk_read(unsigned char endpoint, unsigned char *data,
         (char)((yaw_rate_deg & 0xFF00) >> 8), (char)(yaw_rate_deg & 0xFF),
         (char)((speed_mps & 0xFF00) >> 8),    (char)(speed_mps & 0xFF),
         (char)((altitude_m & 0xFF00) >> 8),   (char)(altitude_m & 0xFF),
-        (char)((h_target & 0xFF00) >> 8),  (char)(h_target & 0xFF),
+        (char)((h_target & 0xFF00) >> 8),     (char)(h_target & 0xFF),
     };
     total_read += pack_can_msg(0, 0x266, content, data + total_read);
+    std::string mode_content = {
+        (char)(this->mavsdk_offboard_plugin->is_active() ? 0x01 : 0x00) &
+        (char)(this->ignited ? 0x02 : 0x00)};
+    total_read += pack_can_msg(0, 0x267, mode_content, data + total_read);
   }
   return total_read;
 }
