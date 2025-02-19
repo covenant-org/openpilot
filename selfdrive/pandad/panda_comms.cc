@@ -869,8 +869,9 @@ int PandaMavlinkHandle::bulk_read(unsigned char endpoint, unsigned char *data,
     };
     total_read += pack_can_msg(0, 0x266, content, data + total_read);
     std::string mode_content = {
-        (char)(this->mavsdk_offboard_plugin->is_active() ? 0x01 : 0x00) &
-        (char)(this->ignited ? 0x02 : 0x00)};
+        static_cast<char>(this->mavsdk_offboard_plugin->is_active() ? 0x01 : 0x00),
+        static_cast<char>(this->ignited ? 0x01 : 0x00),
+    };
     total_read += pack_can_msg(0, 0x267, mode_content, data + total_read);
   }
   return total_read;
