@@ -28,7 +28,6 @@ class CarState(CarStateBase):
     ret.cruiseState.available = True
     ret.canValid = True
     ret.steeringPressed = not cp.vl['DRONE_MODE']['OFFBOARD']
-    print(f"steering pressed: {ret.steeringPressed}")
 
     return ret
 
