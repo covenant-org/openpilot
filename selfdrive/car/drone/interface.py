@@ -14,7 +14,9 @@ class CarInterface(CarInterfaceBase):
     ret.minSteerSpeed = -math.inf
     ret.maxLateralAccel = math.inf  # TODO: set to a reasonable value
     ret.steerLimitTimer = 1.0
-    ret.steerActuatorDelay = 0.
+    ret.steerActuatorDelay = 0.1
+    ret.autoResumeSng = True
+    ret.stoppingControl = True
 
     ret.wheelSpeedFactor = 1.
 
