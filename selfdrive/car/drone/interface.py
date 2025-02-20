@@ -20,13 +20,6 @@ class CarInterface(CarInterfaceBase):
 
     ret.wheelSpeedFactor = 1.
 
-    ret.lateralTuning.init('pid')
-    ret.lateralTuning.pid.kiBP = [0.0]
-    ret.lateralTuning.pid.kpBP = [0.0]
-    ret.lateralTuning.pid.kpV = [0.6]
-    ret.lateralTuning.pid.kiV = [0.1]
-    ret.lateralTuning.pid.kf = 0.00007818594
-
     ret.radarUnavailable = True
     ret.openpilotLongitudinalControl = True
     ret.steerControlType = car.CarParams.SteerControlType.angle
