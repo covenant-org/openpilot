@@ -27,6 +27,7 @@ class CarState(CarStateBase):
     ret.cruiseState.enabled = True
     ret.cruiseState.available = True
     ret.canValid = True
+    ret.steeringPressed = not cp.vl['DRONE_MODE']['OFFBOARD']
 
     return ret
 
@@ -34,5 +35,6 @@ class CarState(CarStateBase):
   def get_can_parser(CP):
     messages = [
       ("DRONE_DATA", 100),
+      ("DRONE_MODE", 100),
     ]
     return CANParser(DBC[CP.carFingerprint]["pt"], messages, 0)

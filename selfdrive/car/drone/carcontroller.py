@@ -7,7 +7,7 @@ from openpilot.selfdrive.car.drone import bodycan
 from openpilot.selfdrive.car.interfaces import CarControllerBase
 from openpilot.selfdrive.controls.lib.pid import PIDController
 
-MAX_ANGLE=math.radians(45)
+MAX_ANGLE=45
 
 class CarController(CarControllerBase):
   def __init__(self, dbc_name, CP, VM):
@@ -20,15 +20,16 @@ class CarController(CarControllerBase):
     # [0.0, 1.0]
     accel = CC.actuators.accel
     desired_speed = (CS.out.vEgo) + accel
-    if desired_speed > 10:
-      desired_speed = 10
+    if desired_speed > 3:
+      desired_speed = 3
     if desired_speed < 0:
       desired_speed = 0
 
     w = 4.5
-    steering_angle = math.radians(CC.actuators.steeringAngleDeg)
-    if(abs(steering_angle) > MAX_ANGLE):
-      steering_angle = math.copysign(MAX_ANGLE, steering_angle)
+    steering_angle_deg = CC.actuators.steeringAngleDeg * MAX_ANGLE
+    if(abs(steering_angle_deg) > MAX_ANGLE):
+      steering_angle_deg = MAX_ANGLE
+    steering_angle = math.radians(steering_angle_deg)
     turn = desired_speed * math.sin(steering_angle) / w
     turn_degrees = math.degrees(turn)
 
