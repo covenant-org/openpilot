@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 import os, sys, io, pathlib
+import cv2
+import numpy as np
+from pathlib import Path
 sys.path.insert(0, str(pathlib.Path(__file__).parents[1]))
 
-if "FLOAT16" not in os.environ: os.environ["FLOAT16"] = "1"
-if "IMAGE" not in os.environ: os.environ["IMAGE"] = "2"
+if "FLOAT16" not in os.environ: os.environ["FLOAT16"] = "0"
+if "IMAGE" not in os.environ: os.environ["IMAGE"] = "0"
 if "NOLOCALS" not in os.environ: os.environ["NOLOCALS"] = "1"
 if "OPT" not in os.environ: os.environ["OPT"] = "99"
 os.environ["PREREALIZE"] = "0"
 
 OPENPILOT_MODEL = "https://github.com/commaai/openpilot/raw/v0.9.4/selfdrive/modeld/models/supercombo.onnx"
+NUCLEA_MODEL = "https://github.com/covenant-org/tinygrad/releases/download/yoloV8-Medium-NucleaV9/best.onnx"
 
 import onnx
 from typing import Tuple, List
@@ -32,7 +36,12 @@ def get_schedule(onnx_data) -> Tuple[List[ScheduleItem], List[ScheduleItem]]:
   input_shapes = {inp.name:tuple(x.dim_value for x in inp.type.tensor_type.shape.dim) for inp in onnx_model.graph.input}
 
   # run the model
-  inputs = {k:Tensor.empty(*shp) for k,shp in input_shapes.items()}
+  target_size = tuple(reversed(input_shapes['images'][2:]))
+  gt_path = Path("/data/tinygrad/models/ground-truth")
+  images_sample = sorted([img for ext in ["*.jpg", "*.jpeg", "*.png"] for img in gt_path.glob(ext)])
+  
+  image = cv2.imread(images_sample[1])
+  inputs = preprocess_image(image, target_size)
   ret: Tensor = next(iter(run_onnx(inputs).values())).cast(dtypes.float32).contiguous()
   schedule = ret.lazydata.schedule()
 
@@ -82,17 +91,40 @@ def schedule_to_thneed(schedule, output_fn):
   runtime = t.run()
   print(f"network using {used_ops/1e9:.2f} GOPS with runtime {runtime*1e3:.2f} ms that's {used_ops/runtime*1e-9:.2f} GFLOPS")
 
+def preprocess_image(image, target_size):
+    resized_image = cv2.resize(image, target_size)
+    normalized_image = resized_image.astype(np.float32) / 255.0
+    chw_image = np.transpose(normalized_image, (2, 0, 1))
+    batched_image = np.expand_dims(chw_image, axis=0)
+
+    new_inputs_numpy = {"images": batched_image}
+
+    for k, v in new_inputs_numpy.items():
+        print(f"{k}: {v.shape}")
+
+    inputs = {k: Tensor(v).realize() for k, v in new_inputs_numpy.items()}
+    return inputs
+
 def thneed_test_onnx(onnx_data, output_fn):
   import onnx
   import pyopencl as cl
   from tinygrad.runtime.ops_gpu import CL
   import numpy as np
   from extra.thneed import Thneed
+  from pathlib import Path
   onnx_model = onnx.load(io.BytesIO(onnx_data))
 
   input_shapes = {inp.name:tuple(x.dim_value for x in inp.type.tensor_type.shape.dim) for inp in onnx_model.graph.input}
-  inputs = {k:Tensor.randn(*shp, requires_grad=False)*8 for k,shp in input_shapes.items()}
-  new_np_inputs = {k:v.realize().numpy() for k,v in inputs.items()}
+  target_size = tuple(reversed(input_shapes['images'][2:]))
+  
+  gt_path = Path("/data/tinygrad/models/ground-truth")
+  images_sample = sorted([img for ext in ["*.jpg", "*.jpeg", "*.png"] for img in gt_path.glob(ext)])
+  
+  image = cv2.imread(images_sample[1])
+  new_np_inputs = preprocess_image(image, target_size)
+  
+  # inputs = {k:Tensor.randn(*shp, requires_grad=False)*8 for k,shp in input_shapes.items()}
+  # new_np_inputs = {k:v.realize().numpy() for k,v in inputs.items()}
 
   if getenv("ORT"):
     # test with onnxruntime
@@ -129,11 +161,11 @@ def thneed_test_onnx(onnx_data, output_fn):
     print("thneed self-test passed!")
 
 if __name__ == "__main__":
-  onnx_data = fetch(sys.argv[1] if len(sys.argv) > 1 else OPENPILOT_MODEL)
+  onnx_data = fetch(sys.argv[1] if len(sys.argv) > 1 else NUCLEA_MODEL)
 
   # quick test for ONNX issues
-  #thneed_test_onnx(onnx_data, None)
-  #exit(0)
+  # thneed_test_onnx(onnx_data, None)
+  # exit(0)
 
   schedule, schedule_independent, inputs = get_schedule(onnx_data)
   schedule, schedule_input = partition(schedule, lambda x: x.ast.op not in LoadOps)
@@ -162,3 +194,5 @@ if __name__ == "__main__":
       thneed_test_onnx(onnx_data, output_fn)
     except ModuleNotFoundError as e:
       print(f"TEST NOT HAPPENING {e}")
+
+
