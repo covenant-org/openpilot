@@ -197,10 +197,6 @@ class ThneedRunner:
         resized_image = cv2.resize(original_image, (640, 480))
         fase1_timer = timer.stop()
 
-        timer.start()
-        output_tensor = output_tensor.numpy()
-        fase2_timer = timer.stop()
-
         if self.debug:
             print("output_tensor:", output_tensor)
 
@@ -251,7 +247,7 @@ class ThneedRunner:
 
         fase3_timer = timer.stop()
 
-        print(f"Post-Inferencia: fase 1: {fase1_timer}ms, fase 2: {fase2_timer}ms, fase 3: {fase3_timer}ms")
+        print(f"Post-Inferencia: fase 1: {fase1_timer}ms, fase 2: {fase3_timer}ms")
         return resized_image
 
     def execute_thneed(self, new_np_inputs):
