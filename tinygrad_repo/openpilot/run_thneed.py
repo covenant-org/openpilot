@@ -3,22 +3,33 @@ import os
 import sys
 import numpy as np
 import pyopencl as cl
+import io
 import cv2
 from pathlib import Path
+import onnx
+from extra.utils import fetch
 from extra.thneed import Thneed
 from tinygrad.tensor import Tensor
 from tinygrad.helpers import dtypes, getenv
 from tinygrad.runtime.ops_gpu import CL
 
+thneed_path = '/data/output.thneed'
+NUCLEA_MODEL = "https://github.com/covenant-org/tinygrad/releases/download/yoloV8-Medium-NucleaV9/best.onnx"
+
 class ThneedRunner:
-    def __init__(self, thneed_path):
+    def __init__(self, thneed_path, onnx_path):
         self.thneed = self.load_thneed(thneed_path)
-        self.input_shapes = {k: v.shape for k, v in self.thneed.inputs.items()}
+        self.input_shapes = self.get_input_shapes(onnx_path)
 
     def load_thneed(self, thneed_path):
         nt = Thneed()
         nt.load(thneed_path)
         return nt
+
+    def get_input_shapes(self, onnx_path):
+        onnx_model = onnx.load(onnx_path)
+        input_shapes = {inp.name: tuple(x.dim_value for x in inp.type.tensor_type.shape.dim) for inp in onnx_model.graph.input}
+        return input_shapes
 
     def preprocess_image(self, image, target_size):
         resized_image = cv2.resize(image, target_size)
@@ -68,10 +79,15 @@ class ThneedRunner:
         print("Output:", output)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python run_thneed.py <path_to_thneed_file>")
+    if len(sys.argv) < 3:
+        print("Usage: python run_thneed.py <path_to_thneed_file> <path_to_onnx_file>")
         sys.exit(1)
-
-    thneed_path = sys.argv[1]
-    runner = ThneedRunner(thneed_path)
+        
+    thneed_path = Path(sys.argv[1])
+    onnx_path = Path(sys.argv[2])     
+    if not onnx_path.is_file:
+        onnx_data = fetch(NUCLEA_MODEL)
+        onnx_path = io.BytesIO(onnx_data)
+    
+    runner = ThneedRunner(thneed_path, onnx_path)
     runner.run()
