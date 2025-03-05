@@ -174,9 +174,6 @@ class ThneedRunner:
 
         new_inputs_numpy = {"images": batched_image}
 
-        for k, v in new_inputs_numpy.items():
-            print(f"{k}: {v.shape}")
-
         inputs = {k: Tensor(v).realize() for k, v in new_inputs_numpy.items()}
         return inputs
 
@@ -278,6 +275,11 @@ class ThneedRunner:
         self.acum_time.append(total_time)
         
         return postprocessed_image
+    def draw_bounding_box(self, img, class_id, confidence, x, y, x_plus_w, y_plus_h):
+        label = f'{self.model_files.classes[class_id]} ({confidence:.2f})'
+        color = self.model_files.classes_color[class_id]
+        cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, 2)
+        cv2.putText(img, label, (x - 10, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
 
 def main():
