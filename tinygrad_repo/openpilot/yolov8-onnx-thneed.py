@@ -46,7 +46,8 @@ parser = argparse.ArgumentParser(description="Descargar modelo y dataset")
 # Agregar argumentos
 parser.add_argument("--url_model", type=str, default="https://github.com/covenant-org/tinygrad/releases/download/yoloV8-Medium-NucleaV9/best.onnx", help="URL del modelo ONNX")
 parser.add_argument("--url_dataset", type=str, default="https://app.roboflow.com/ds/qnXOxt8VKv?key=1mmF2G81LD", help="URL del dataset")
-parser.add_argument("--model_path_pkl", type=str, default="", help="Direccion del pkl")
+parser.add_argument("--thneed_path", type=str, default="", help="Direccion del pkl")
+parser.add_argument("--onnx_path", type=str, default="", help="Direccion del pkl")
 parser.add_argument("--imshow", type=str, default="True", help="Mostrar imágenes a tiempo real")
 args = parser.parse_args()
 
@@ -290,12 +291,8 @@ class ThneedRunner:
 
 def main():
     os.chdir("/tmp")
-    if len(sys.argv) < 3:
-        print("Usage: python run_thneed.py <path_to_thneed_file> <path_to_onnx_file>")
-        sys.exit(1)
-    
-    thneed_path = Path(sys.argv[1])
-    onnx_path = Path(sys.argv[2])     
+    thneed_path = Path(args.thneed_path)
+    onnx_path = Path(args.onnx_path)     
     if not onnx_path.is_file:
         onnx_data = fetch(NUCLEA_MODEL)
         onnx_path = io.BytesIO(onnx_data)
