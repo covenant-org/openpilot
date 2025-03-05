@@ -121,11 +121,9 @@ def thneed_test_onnx(onnx_data, output_fn):
   images_sample = sorted([img for ext in ["*.jpg", "*.jpeg", "*.png"] for img in gt_path.glob(ext)])
   
   image = cv2.imread(images_sample[1])
-  new_np_inputs = preprocess_image(image, target_size)
+  inputs = preprocess_image(image, target_size)
+  new_np_inputs = {k: v.realize().numpy() for k, v in inputs.items()}  # Convertir a numpy arrays
   
-  # inputs = {k:Tensor.randn(*shp, requires_grad=False)*8 for k,shp in input_shapes.items()}
-  # new_np_inputs = {k:v.realize().numpy() for k,v in inputs.items()}
-
   if getenv("ORT"):
     # test with onnxruntime
     import onnxruntime as ort
@@ -164,8 +162,8 @@ if __name__ == "__main__":
   onnx_data = fetch(sys.argv[1] if len(sys.argv) > 1 else NUCLEA_MODEL)
 
   # quick test for ONNX issues
-  # thneed_test_onnx(onnx_data, None)
-  # exit(0)
+  thneed_test_onnx(onnx_data, None)
+  exit(0)
 
   schedule, schedule_independent, inputs = get_schedule(onnx_data)
   schedule, schedule_input = partition(schedule, lambda x: x.ast.op not in LoadOps)
