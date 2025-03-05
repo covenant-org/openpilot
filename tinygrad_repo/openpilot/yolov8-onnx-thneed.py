@@ -197,15 +197,9 @@ class ThneedRunner:
         resized_image = cv2.resize(original_image, (640, 480))
         fase1_timer = timer.stop()
 
-        if self.debug:
-            print("output_tensor:", output_tensor)
-
         timer.start()
         output_tensor = np.transpose(output_tensor, (0, 2, 1))
         rows = output_tensor.shape[1]
-
-        if self.debug:
-            print(f"Forma transpuesta: {output_tensor.shape}")
 
         boxes, scores, class_ids = [], [], []
         for i in range(rows):
@@ -304,7 +298,6 @@ def main():
     # tinygrad_model.load_pkl(args.model_path_pkl, images_sample)
     runner = ThneedRunner(thneed_path, onnx_path)
     
-    print("Classes: ", model_files.classes) if debug else None
 
     for image_path in model_files.images_sample:
         original_image = cv2.imread(image_path)
