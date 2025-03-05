@@ -149,9 +149,10 @@ class ModelDownloader:
       return self.images_sample
 
 class ThneedRunner:
-    def __init__(self, thneed_path, onnx_path):
+    def __init__(self, thneed_path, onnx_path, model_files):
         self.thneed = self.load_thneed(thneed_path)
         self.input_shapes = self.get_input_shapes(onnx_path)
+        self.model_files = model_files
         
         self.acum_time = []
 
@@ -296,7 +297,7 @@ def main():
     # tinygrad_model = ModelProcessor(model_files)
     # tinygrad_model.load_onnx(model_files.model_path_onnx) 
     # tinygrad_model.load_pkl(args.model_path_pkl, images_sample)
-    runner = ThneedRunner(thneed_path, onnx_path)
+    runner = ThneedRunner(thneed_path, onnx_path, model_files)
     
 
     for image_path in model_files.images_sample:
