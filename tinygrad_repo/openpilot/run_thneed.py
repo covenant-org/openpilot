@@ -64,7 +64,7 @@ class ThneedRunner:
         self.thneed.run()
 
         # Obtener las salidas del modelo
-        new_thneed_out = np.empty((self.thneed.outputs[0].size // 4,), dtype=np.float32).reshape(self.input_shapes['images'][2:])
+        new_thneed_out = np.empty((self.thneed.outputs[0].size // 4,), dtype=np.float32).reshape(self.input_shapes['images'][1:])
         cl.enqueue_copy(CL.cl_queue[0], new_thneed_out, self.thneed.outputs[0], is_blocking=True)
         return new_thneed_out
 
