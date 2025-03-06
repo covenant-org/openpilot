@@ -38,9 +38,9 @@ def main():
         
     thneed_path = Path(args.thneed_path)
     model_name = args.url_model.split("/")[-2]
-    if not thneed_path.is_file and args.url_model:
-        print(":0")
-        thneed_path = model_files.model_path_onnx.parent / (model_name + ".thneed")
+    # if not thneed_path.is_file and args.url_model:
+    #     print(":0")
+    thneed_path = model_files.model_path_onnx.parent / (model_name + ".thneed")
     
     model_files = ModelDownloader(args.url_model, args.url_dataset)
     model_files.download_model()
