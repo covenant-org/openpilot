@@ -36,15 +36,17 @@ def main():
     
     # onnx_path = Path(args.onnx_path)     
     # if not onnx_path.is_file:
-    onnx_data = fetch(args.url_model)
-    onnx_path = io.BytesIO(onnx_data)
-    print("ONNX path: ", onnx_path)
+    # onnx_data = fetch(args.url_model)
+    # onnx_path = io.BytesIO(onnx_data)
+    
         
     thneed_path = Path(args.thneed_path)
     model_name = args.url_model.split("/")[-2]
     # if not thneed_path.is_file and args.url_model:
     #     print(":0")
     thneed_path = model_files.model_path_onnx.parent / (model_name + ".thneed")
+    onnx_path = model_files.model_path_onnx
+    print("ONNX path: ", onnx_path)
     
     print(f"Running model")
     print(f"Loaded in {thneed_path}")
