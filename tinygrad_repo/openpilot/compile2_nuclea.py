@@ -189,7 +189,9 @@ if __name__ == "__main__":
   url_model = sys.argv[1]
   if url_model:
     model_name = url_model.split("/")[-2]
-  model_path_onnx = base_path / model_name / (model_name + ".thneed")
+  model_path_thneed = base_path / model_name
+  model_path_thneed.mkdir(parents=True, exist_ok=True)
+  model_path_thneed = model_path_thneed / (model_name + ".thneed")
   
   output_fn = sys.argv[2] if len(sys.argv) >= 3 else model_path_onnx
   schedule_to_thneed(schedule, output_fn)
