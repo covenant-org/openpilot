@@ -34,11 +34,11 @@ def main():
     model_files.download_model()
     model_files.download_dataset()
     
-    onnx_path = Path(args.onnx_path)     
-    if not onnx_path.is_file:
-        onnx_data = fetch(args.url_model)
-        onnx_path = io.BytesIO(onnx_data)
-        print("ONNX path: ", onnx_path)
+    # onnx_path = Path(args.onnx_path)     
+    # if not onnx_path.is_file:
+    onnx_data = fetch(args.url_model)
+    onnx_path = io.BytesIO(onnx_data)
+    print("ONNX path: ", onnx_path)
         
     thneed_path = Path(args.thneed_path)
     model_name = args.url_model.split("/")[-2]
