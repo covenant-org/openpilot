@@ -30,6 +30,9 @@ print(f"URL del dataset: {args.url_dataset}")
 
 def main():
     os.chdir("/tmp")
+    model_files = ModelDownloader(args.url_model, args.url_dataset)
+    model_files.download_model()
+    model_files.download_dataset()
     
     onnx_path = Path(args.onnx_path)     
     if not onnx_path.is_file:
@@ -42,9 +45,7 @@ def main():
     #     print(":0")
     thneed_path = model_files.model_path_onnx.parent / (model_name + ".thneed")
     
-    model_files = ModelDownloader(args.url_model, args.url_dataset)
-    model_files.download_model()
-    model_files.download_dataset()
+
     
     print(f"Running model")
     print(f"Loaded in {thneed_path}")
