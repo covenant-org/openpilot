@@ -15,7 +15,7 @@ MODELS=(
 
 for MODEL_URL in "${MODELS[@]}"; do
     echo "Ejecutando modelo: $MODEL_URL"
-    $PYTHON_EXEC $SCRIPT_PATH "$MODEL_URL" 
+    ORT=1 PYOPENCL_COMPILER_OUTPUT=1 $PYTHON_EXEC $SCRIPT_PATH "$MODEL_URL"
     if [ $? -ne 0 ]; then
         echo "Error ejecutando el modelo: $MODEL_URL"
         exit 1
