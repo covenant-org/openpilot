@@ -124,11 +124,12 @@ def thneed_test_onnx(onnx_data, output_fn):
   inputs = preprocess_image(image, target_size)
   new_np_inputs = {k: v.realize().numpy() for k, v in inputs.items()}  # Convertir a numpy arrays
   
+  print("Executing onnx model")
   if getenv("ORT"):
     # test with onnxruntime
     import onnxruntime as ort
     onnx_session = ort.InferenceSession(onnx_data)
-    onnx_output = onnx_session.run([onnx_model.graph.output[0].name], {k:v.astype(np.float16) for k,v in new_np_inputs.items()})
+    onnx_output = onnx_session.run([onnx_model.graph.output[0].name], {k:v.astype(np.float32) for k,v in new_np_inputs.items()})
     new_torch_out = onnx_output[0]
   else:
     # test with torch
@@ -142,6 +143,7 @@ def thneed_test_onnx(onnx_data, output_fn):
     np.testing.assert_allclose(new_torch_out, new_tinygrad_out, atol=1e-4, rtol=1e-2)
     print("classic self-test passed!")
   else:
+    print("Executing Thneed model")
     # load thneed and try that
     nt = Thneed()
     nt.load(output_fn)
@@ -162,8 +164,8 @@ if __name__ == "__main__":
   onnx_data = fetch(sys.argv[1] if len(sys.argv) > 1 else NUCLEA_MODEL)
 
   # quick test for ONNX issues
-  thneed_test_onnx(onnx_data, None)
-  exit(0)
+  # thneed_test_onnx(onnx_data, "/data/output.thneed")
+  # exit(0)
 
   schedule, schedule_independent, inputs = get_schedule(onnx_data)
   schedule, schedule_input = partition(schedule, lambda x: x.ast.op not in LoadOps)
@@ -183,14 +185,20 @@ if __name__ == "__main__":
     GlobalCounters.reset()
     run_schedule(schedule[:])
 
-  output_fn = sys.argv[2] if len(sys.argv) >= 3 else "/tmp/output.thneed"
+  base_path = Path("/data/tinygrad/models")
+  url_model = sys.argv[1]
+  if url_model:
+    model_name = url_model.split("/")[-2]
+  model_path_onnx = base_path / model_name / (model_name + ".thneed")
+  
+  output_fn = sys.argv[2] if len(sys.argv) >= 3 else model_path_onnx
   schedule_to_thneed(schedule, output_fn)
 
-  FLOAT16 = getenv("FLOAT16", 0)
-  if FLOAT16 == 0:
-    try:
-      thneed_test_onnx(onnx_data, output_fn)
-    except ModuleNotFoundError as e:
-      print(f"TEST NOT HAPPENING {e}")
+  # FLOAT16 = getenv("FLOAT16", 0)
+  # if FLOAT16 == 0:
+  #   try:
+  #     thneed_test_onnx(onnx_data, output_fn)
+  #   except ModuleNotFoundError as e:
+  #     print(f"TEST NOT HAPPENING {e}")
 
 
