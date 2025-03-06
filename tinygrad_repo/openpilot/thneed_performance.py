@@ -37,15 +37,15 @@ def main():
         onnx_path = io.BytesIO(onnx_data)
         
     thneed_path = Path(args.thneed_path)
+    model_name = args.url_model.split("/")[-2]
     if not thneed_path.is_file and args.url_model:
-        model_name = args.url_model.split("/")[-2]
         thneed_path = model_files.model_path_onnx.parent / (model_name + ".thneed")
     
     model_files = ModelDownloader(args.url_model, args.url_dataset)
     model_files.download_model()
     model_files.download_dataset()
     
-    print(f"Running {model_name} model")
+    print(f"Running model")
     print(f"Loaded in {thneed_path}")
     runner = ThneedRunner(thneed_path, onnx_path, model_files)
     
