@@ -6,6 +6,7 @@ import numpy as np
 import cereal.messaging as messaging
 from cereal import car, log
 from pathlib import Path
+import cv2
 from setproctitle import setproctitle
 from cereal.messaging import PubMaster, SubMaster
 from msgq.visionipc import VisionIpcClient, VisionStreamType, VisionBuf
@@ -76,6 +77,15 @@ def main(demo=False):
   with car.CarParams.from_bytes(params.get("CarParams", block=True)) as msg:
     CP = msg
 
+  width, height = vipc_client_main.width, vipc_client_main.height
+  fps = 20
+  out = cv2.VideoWriter('appsrc ! videoconvert' + \
+  ' ! video/x-raw,format=I420' + \
+  ' ! x264enc speed-preset=ultrafast bitrate=600 key-int-max=' + str(fps * 2) + \
+  ' ! video/x-h264,profile=baseline' + \
+  ' ! rtspclientsink location=rtsp://159.54.131.60:8554/mystream',
+  cv2.CAP_GSTREAMER, 0, fps, (width, height), True)
+
   while True:
     # Keep receiving frames until we are at least 1 frame ahead of previous extra frame
     buf_main = vipc_client_main.recv()
@@ -112,7 +122,9 @@ def main(demo=False):
       cloudlog.error(f"skipping remote frame. Dropped {vipc_dropped_frames} frames")
 
     mt1 = time.perf_counter()
-    print(buf_main)
+    frame_raw_nv12 = buf_main.data
+    frame_rgb = cv2.cvtColor(frame_raw_nv12, cv2.COLOR_YUV2RGB_YV12)
+    out.write(frame_rgb)
     mt2 = time.perf_counter()
     model_execution_time = mt2 - mt1
 
