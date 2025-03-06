@@ -194,11 +194,11 @@ if __name__ == "__main__":
   output_fn = sys.argv[2] if len(sys.argv) >= 3 else model_path_onnx
   schedule_to_thneed(schedule, output_fn)
 
-  # FLOAT16 = getenv("FLOAT16", 0)
-  # if FLOAT16 == 0:
-  #   try:
-  #     thneed_test_onnx(onnx_data, output_fn)
-  #   except ModuleNotFoundError as e:
-  #     print(f"TEST NOT HAPPENING {e}")
+  FLOAT16 = getenv("FLOAT16", 0)
+  if FLOAT16 == 0:
+    try:
+      thneed_test_onnx(onnx_data, output_fn)
+    except ModuleNotFoundError as e:
+      print(f"TEST NOT HAPPENING {e}")
 
 
