@@ -5,6 +5,7 @@ import pickle
 import time
 import cv2
 import onnx
+import onnxruntime as ort
 import io
 import numpy as np
 import yaml
@@ -24,6 +25,7 @@ from tinygrad.tensor import Tensor
 from tinygrad.helpers import DEBUG
 from extra.thneed import Thneed
 from tinygrad.runtime.ops_gpu import CL
+
 
 # Mostrar dispositivos disponibles
 
@@ -151,7 +153,7 @@ class ModelDownloader:
 class ThneedRunner:
     def __init__(self, thneed_path, onnx_path, model_files):
         self.thneed = self.load_thneed(thneed_path)
-        self.input_shapes = self.get_input_shapes(onnx_path)
+        self.input_shapes, self.output_shapes = self.get_onnx_shapes(onnx_path)
         self.model_files = model_files
         
         self.acum_time = []
@@ -161,10 +163,11 @@ class ThneedRunner:
         nt.load(thneed_path)
         return nt
 
-    def get_input_shapes(self, onnx_path):
+    def get_onnx_shapes(self, onnx_path):
         onnx_model = onnx.load(onnx_path)
         input_shapes = {inp.name: tuple(x.dim_value for x in inp.type.tensor_type.shape.dim) for inp in onnx_model.graph.input}
-        return input_shapes
+        output_shapes = {out.name: tuple(x.dim_value for x in out.type.tensor_type.shape.dim) for out in onnx_model.graph.output}
+        return input_shapes, output_shapes
 
     def preprocess_image(self, image, target_size):
         resized_image = cv2.resize(image, target_size)
@@ -250,8 +253,10 @@ class ThneedRunner:
         # Ejecutar el plan de ejecución de Thneed
         self.thneed.run()
 
+        self.get_onnx_shapes(self.onnx_path, new_np_inputs)
+
         # Obtener las salidas del modelo
-        new_thneed_out = np.empty((self.thneed.outputs[0].size // 4,), dtype=np.float32).reshape((1, 61, 6300))
+        new_thneed_out = np.empty((self.thneed.outputs[0].size // 4,), dtype=np.float32).reshape(self.output_shapes)
         cl.enqueue_copy(CL.cl_queue[0], new_thneed_out, self.thneed.outputs[0], is_blocking=True)
         return new_thneed_out
 
