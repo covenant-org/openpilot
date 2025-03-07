@@ -167,7 +167,7 @@ class ThneedRunner:
         onnx_model = onnx.load(onnx_path)
         input_shapes = {inp.name: tuple(x.dim_value for x in inp.type.tensor_type.shape.dim) for inp in onnx_model.graph.input}
         output_shapes = {out.name: tuple(x.dim_value for x in out.type.tensor_type.shape.dim) for out in onnx_model.graph.output}
-        return input_shapes, output_shapes[0]
+        return input_shapes, output_shapes['output0']
 
     def preprocess_image(self, image, target_size):
         resized_image = cv2.resize(image, target_size)
