@@ -253,8 +253,6 @@ class ThneedRunner:
         # Ejecutar el plan de ejecución de Thneed
         self.thneed.run()
 
-        self.get_onnx_shapes(self.onnx_path, new_np_inputs)
-
         # Obtener las salidas del modelo
         new_thneed_out = np.empty((self.thneed.outputs[0].size // 4,), dtype=np.float32).reshape(self.output_shapes)
         cl.enqueue_copy(CL.cl_queue[0], new_thneed_out, self.thneed.outputs[0], is_blocking=True)
