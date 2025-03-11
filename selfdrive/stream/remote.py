@@ -1,129 +1,136 @@
 #!/usr/bin/env python3
-import os
-import time
-import pickle
-import numpy as np
-import cereal.messaging as messaging
-import socket
-import pickle
-from cereal import car, log
-from pathlib import Path
-from setproctitle import setproctitle
-from cereal.messaging import PubMaster, SubMaster
-from msgq.visionipc import VisionIpcClient, VisionStreamType, VisionBuf
-from openpilot.common.swaglog import cloudlog
-from openpilot.common.params import Params
-from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.common.realtime import config_realtime_process
-from openpilot.common.transformations.camera import DEVICE_CAMERAS, CameraConfig
-from openpilot.common.transformations.model import get_warp_matrix
-from openpilot.system import sentry
-from openpilot.selfdrive.car.car_helpers import get_demo_car_params
-from openpilot.selfdrive.controls.lib.desire_helper import DesireHelper
-from openpilot.selfdrive.modeld.runners import ModelRunner, Runtime
-from openpilot.selfdrive.modeld.parse_model_outputs import Parser
-from openpilot.selfdrive.modeld.fill_model_msg import fill_model_msg, fill_pose_msg, PublishState
-from openpilot.selfdrive.modeld.constants import ModelConstants
-from openpilot.selfdrive.modeld.models.commonmodel_pyx import ModelFrame, CLContext
-import zlib
-from collections import namedtuple
-from threading import Thread
-from time import sleep
+import argparse
+import asyncio
+import logging
 
-FrameInfo = namedtuple("FrameInfo", ["width", "height", "fps", "pixel_format"])
+import aiohttp
+
+from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack, RTCIceServer, RTCConfiguration
+from openpilot.system.webrtc.device.video import LiveStreamVideoStreamTrack
+from aiortc.contrib.media import MediaPlayer
+from threading import Event
+
+pcs = set()
+_exit = Event()
 
 
-PROCESS_NAME = "selfdrive.stream.remote"
-class FrameMeta:
-  frame_id: int = 0
-  timestamp_sof: int = 0
-  timestamp_eof: int = 0
+class WhipSession:
+    def __init__(self, url):
+        self._http = None
+        self._whip_url = url
+        self._session_url = None
+        self._turn = None
+        self._offersdp = None
+        self._answersdp = None
 
-  def __init__(self, vipc=None):
-    if vipc is not None:
-      self.frame_id, self.timestamp_sof, self.timestamp_eof = vipc.frame_id, vipc.timestamp_sof, vipc.timestamp_eof
+    async def createEndpoint(self, offer):
+        self._http = aiohttp.ClientSession(
+            connector=aiohttp.TCPConnector(ssl=False))
+        self._offersdp = offer.sdp
+        headers = {'content-type': 'application/sdp'}
+        async with self._http.post(self._whip_url, headers=headers, data=self._offersdp) as response:
+            print(response)
+            location = response.headers["Location"]
+            assert isinstance(location, str)
+            self._answersdp = await response.text()
+            host = self._whip_url.split("//")[-1].split("/")[0]
+            self._session_url = "http://" + host + location
 
-def send_frame(conn, frame):
-    frame_raw_nv12 = frame.astype(np.uint8)
-    compressed_frame = zlib.compress(frame_raw_nv12.tobytes())
-    conn.sendall(bytes([1]) + int(len(compressed_frame)).to_bytes(length=4, byteorder="big") + compressed_frame)
+    async def trickle(self, data):
+        self._http = aiohttp.ClientSession()
+        headers = {'content-type': 'application/trickle-ice-sdpfrag',
+                   'Authorization': 'Bearer +' + self._token}
+        async with self._http.patch(self._session_url, headers=headers, data=data) as response:
+            print(response)
+            data = await response.text()
 
+    async def destroy(self):
+        if self._session_url:
+            headers = {'Authorization': 'Bearer ' + self._token}
+            async with self._http.delete(self._session_url, headers=headers) as response:
+                print(response)
+                assert response.ok == True
+            self._session_url = None
 
-def main(demo=False):
-  setproctitle(PROCESS_NAME)
-  config_realtime_process(7, 54)
-
-  cloudlog.warning("setting up CL context")
-  cl_context = CLContext()
-  cloudlog.warning("CL context ready; loading model")
-
-  # visionipc clients
-  while True:
-    available_streams = VisionIpcClient.available_streams("camerad", block=False)
-    if available_streams:
-      main_wide_camera = VisionStreamType.VISION_STREAM_ROAD not in available_streams
-      break
-    time.sleep(.1)
-
-  vipc_client_main_stream = VisionStreamType.VISION_STREAM_WIDE_ROAD if main_wide_camera else VisionStreamType.VISION_STREAM_ROAD
-  vipc_client_main = VisionIpcClient("camerad", vipc_client_main_stream, True, cl_context)
-  cloudlog.warning(f"vision stream set up, main_wide_camera: {main_wide_camera}")
-
-  while not vipc_client_main.connect(False):
-    time.sleep(0.1)
-
-  cloudlog.warning(f"connected main cam with buffer size: {vipc_client_main.buffer_len} ({vipc_client_main.width} x {vipc_client_main.height})")
-
-  # setup filter to track dropped frames
-  frame_dropped_filter = FirstOrderFilter(0., 10., 1. / ModelConstants.MODEL_FREQ)
-  frame_id = 0
-  last_vipc_frame_id = 0
-  run_count = 0
-
-  buf_main, buf_extra = None, None
-  meta_main = FrameMeta()
-  meta_extra = FrameMeta()
-
-  sm = SubMaster(["roadCameraState"])
-  params = Params()
-
-  with car.CarParams.from_bytes(params.get("CarParams", block=True)) as msg:
-    CP = msg
-
-  width, height = vipc_client_main.width, vipc_client_main.height
-  fps = 20
-  info = FrameInfo(width=width, height=height, fps=fps, pixel_format="nv12")
-  conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-  conn.connect(("192.168.100.100", 4020))
-  serialized_info = pickle.dumps(info)
-#  print(bytes([0])+int(len(serialized_info)).to_bytes(length=4, byteorder="big") + serialized_info)
-  conn.sendall(bytes([0])+int(len(serialized_info)).to_bytes(length=4, byteorder="big") + serialized_info)
-  sock = messaging.sub_sock("livestreamRoadEncodeData", conflate=True)
+        if self._http:
+            await self._http.close()
+            self._http = None
 
 
-  while True:
-    # Keep receiving frames until we are at least 1 frame ahead of previous extra frame
+async def publish(session, track):
+    """
+    Live stream video to the room.
+    """
+    if session._turn:
+        turnArr = session._turn.split("@")[0].split(":")
+        turnurl = turnArr[0] + ":" + turnArr[1] + ":" + turnArr[2]
+        turnuser = session._turn.split("@")[1].split(":")[0]
+        turnpass = session._turn.split("@")[1].split(":")[1]
+        pc = RTCPeerConnection(configuration=RTCConfiguration(
+            iceServers=[RTCIceServer(
+                urls=["stun:stun.l.google.com:19302", turnurl],
+                username=turnuser,
+                credential=turnpass)]))
+    else:
+        pc = RTCPeerConnection(configuration=RTCConfiguration(
+            iceServers=[RTCIceServer("stun:stun.l.google.com:19302")]))
 
-    msg = None
-    while True:
-      msg = messaging.recv_one_or_none(sock)
-      if msg is not None:
-        break
-      sleep(0.005)
+    pcs.add(pc)
+    pc.addTransceiver("video", direction="sendonly")
 
-    evta = getattr(msg, msg.which())
-    frame = evta.header + evta.data
-    conn.sendall(bytes([1]) + int(len(frame)).to_bytes(length=4, byteorder="big") + frame)
+    @pc.on("iceconnectionstatechange")
+    async def on_iceconnectionstatechange():
+        print("ICE connection state is", pc.iceConnectionState)
+        if pc.iceConnectionState == "failed":
+            await pc.close()
+            pcs.discard(pc)
 
-    #send_frame(conn, buf_main.data)
+    # configure media
+    pc.addTrack(track)
 
+    # send offer
+    offer = await pc.createOffer()
+    await pc.setLocalDescription(offer)
+
+    # Create WHIP endpoint with the SDP offer
+    await session.createEndpoint(offer)
+    print(session)
+    # apply answer
+    await pc.setRemoteDescription(
+        RTCSessionDescription(
+            sdp=session._answersdp, type="answer"
+        )
+    )
+    # aiortc doesn't support trickle ice yet
+    # await session.trickle("")
+
+
+async def run(track, session):
+    # send video
+    await publish(session=session, track=track)
+    # exchange media for 1 minute
+    print("Exchanging media...")
+    while not _exit.is_set():
+        await asyncio.sleep(1)
+    print("Done")
 
 
 if __name__ == "__main__":
-  try:
-    main()
-  except KeyboardInterrupt:
-    cloudlog.warning(f"child {PROCESS_NAME} got SIGINT")
-  except Exception:
-    sentry.capture_exception()
-    raise
+    # HTTP signaling and peer connection
+    session = WhipSession("http://192.168.100.100:8889/mystream/whip")
+
+    # create media source
+
+    loop = asyncio.get_event_loop()
+    try:
+        track = LiveStreamVideoStreamTrack("road")
+        loop.run_until_complete(
+            run(track=track, session=session)
+        )
+    except KeyboardInterrupt:
+        _exit.set()
+    finally:
+        loop.run_until_complete(session.destroy())
+        # close peer connections
+        coros = [pc.close() for pc in pcs]
+        loop.run_until_complete(asyncio.gather(*coros))
