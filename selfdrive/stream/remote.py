@@ -5,6 +5,7 @@ import logging
 
 import aiohttp
 
+import aiortc
 from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack, RTCIceServer, RTCConfiguration
 from openpilot.system.webrtc.device.video import LiveStreamVideoStreamTrack
 from aiortc.contrib.media import MediaPlayer
@@ -46,7 +47,7 @@ class WhipSession:
 
     async def destroy(self):
         if self._session_url:
-            headers = {'Authorization': 'Bearer ' + self._token}
+            headers = {}
             async with self._http.delete(self._session_url, headers=headers) as response:
                 print(response)
                 assert response.ok == True
@@ -77,6 +78,7 @@ async def publish(session, track):
 
     pcs.add(pc)
     pc.addTransceiver("video", direction="sendonly")
+#    pc.addTransceiver("audio", direction="sendonly")
 
     @pc.on("iceconnectionstatechange")
     async def on_iceconnectionstatechange():
@@ -86,7 +88,13 @@ async def publish(session, track):
             pcs.discard(pc)
 
     # configure media
-    pc.addTrack(track)
+    sender = pc.addTrack(track)
+    if hasattr(track, "codec_preference") and track.codec_preference() is not None:
+      transceiver = next(t for t in pc.getTransceivers() if t.sender == sender)
+      codec_mime = f"video/{track.codec_preference().upper()}"
+      rtp_codecs = aiortc.RTCRtpSender.getCapabilities("video").codecs
+      rtp_codec = [c for c in rtp_codecs if c.mimeType == codec_mime]
+      transceiver.setCodecPreferences(rtp_codec)
 
     # send offer
     offer = await pc.createOffer()
@@ -107,23 +115,26 @@ async def publish(session, track):
 
 async def run(track, session):
     # send video
+    frame = await track.recv()
     await publish(session=session, track=track)
     # exchange media for 1 minute
     print("Exchanging media...")
     while not _exit.is_set():
-        await asyncio.sleep(1)
+        await asyncio.sleep(600)
     print("Done")
 
 
 if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+
+    track = LiveStreamVideoStreamTrack("road")
+
     # HTTP signaling and peer connection
-    session = WhipSession("http://192.168.100.100:8889/mystream/whip")
+    session = WhipSession("http://159.54.131.60:8889/comma/whip")
 
     # create media source
 
-    loop = asyncio.get_event_loop()
     try:
-        track = LiveStreamVideoStreamTrack("road")
         loop.run_until_complete(
             run(track=track, session=session)
         )
