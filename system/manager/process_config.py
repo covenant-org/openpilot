@@ -65,7 +65,8 @@ procs = [
 
   NativeProcess("loggerd", "system/loggerd", ["./loggerd"], logging),
   NativeProcess("encoderd", "system/loggerd", ["./encoderd"], only_onroad),
-  NativeProcess("encoderd", "selfdrive/stream", ["./remote.py"], only_onroad),
+  NativeProcess("stream_remote", "selfdrive/stream", ["./remote.py"], only_onroad),
+  NativeProcess("model_remote", "selfdrive/stream", ["./model_path.py"], only_onroad),
   NativeProcess("stream_encoderd", "system/loggerd", ["./encoderd", "--stream"], notcar),
   PythonProcess("logmessaged", "system.logmessaged", always_run),
 
@@ -108,10 +109,10 @@ procs = [
   PythonProcess("statsd", "system.statsd", always_run),
 
   # debug procs
-  NativeProcess("bridge", "cereal/messaging", ["./bridge"], notcar),
-  PythonProcess("webrtcd", "system.webrtc.webrtcd", notcar),
-  PythonProcess("webjoystick", "tools.bodyteleop.web", notcar),
-  PythonProcess("joystick", "tools.joystick.joystick_control", and_(joystick, iscar)),
+#  NativeProcess("bridge", "cereal/messaging", ["./bridge"], notcar),
+#  PythonProcess("webrtcd", "system.webrtc.webrtcd", notcar),
+#  PythonProcess("webjoystick", "tools.bodyteleop.web", notcar),
+#  PythonProcess("joystick", "tools.joystick.joystick_control", and_(joystick, iscar)),
 ]
 
 managed_processes = {p.name: p for p in procs}
