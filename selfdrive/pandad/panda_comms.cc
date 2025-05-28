@@ -423,6 +423,18 @@ void PandaMavlinkHandle::read_pipe() {
       this->mavsdk_offboard_plugin->stop();
       break;
     }
+    case 'h': {
+      this->mavsdk_action_plugin->hold();
+      break;
+    }
+    case 'r': {
+      this->mavsdk_action_plugin->return_to_launch();
+      break;
+    }
+    case 'l': {
+      this->mavsdk_action_plugin->land();
+      break;
+    }
     }
   }
 }
@@ -869,9 +881,10 @@ int PandaMavlinkHandle::bulk_read(unsigned char endpoint, unsigned char *data,
     };
     total_read += pack_can_msg(0, 0x266, content, data + total_read);
     std::string mode_content = {0x00, 0x00};
-    if(this->drone){
+    if (this->drone) {
       mode_content = {
-          static_cast<char>(this->mavsdk_offboard_plugin->is_active() ? 0x01 : 0x00),
+          static_cast<char>(this->mavsdk_offboard_plugin->is_active() ? 0x01
+                                                                      : 0x00),
           static_cast<char>(this->ignited ? 0x01 : 0x00),
       };
     }
