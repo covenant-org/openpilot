@@ -22,7 +22,6 @@ public:
   virtual std::vector<i2c_random_wr_payload> getExposureRegisters(int exposure_time, int new_exp_g, bool dc_gain_enabled) const { return {}; }
   virtual float getExposureScore(float desired_ev, int exp_t, int exp_g_idx, float exp_gain, int gain_idx) const {return 0; }
   virtual int getSlaveAddress(int port) const { assert(0); }
-  virtual void processRegisters(uint8_t *cur_buf, cereal::FrameData::Builder &framed) const {}
 
   cereal::FrameData::ImageSensor image_sensor = cereal::FrameData::ImageSensor::UNKNOWN;
   float pixel_size_mm;
@@ -30,6 +29,7 @@ public:
   uint32_t frame_stride;
   uint32_t frame_offset = 0;
   uint32_t extra_height = 0;
+  int out_scale = 1;
   int registers_offset = -1;
   int stats_offset = -1;
   int hdr_offset = -1;
@@ -79,9 +79,13 @@ public:
     }
     gamma_lut_rgb.pop_back();
   }
-  std::vector<uint32_t> linearization_lut;     // length 288
+  std::vector<uint32_t> linearization_lut;     // length 36
   std::vector<uint32_t> linearization_pts;     // length 4
-  std::vector<uint32_t> vignetting_lut;        // 2x length 884
+  std::vector<uint32_t> vignetting_lut;        // length 221
+
+  const int num() const {
+    return static_cast<int>(image_sensor);
+  };
 };
 
 class AR0231 : public SensorInfo {
@@ -90,7 +94,6 @@ public:
   std::vector<i2c_random_wr_payload> getExposureRegisters(int exposure_time, int new_exp_g, bool dc_gain_enabled) const override;
   float getExposureScore(float desired_ev, int exp_t, int exp_g_idx, float exp_gain, int gain_idx) const override;
   int getSlaveAddress(int port) const override;
-  void processRegisters(uint8_t *cur_buf, cereal::FrameData::Builder &framed) const override;
 
 private:
   mutable std::map<uint16_t, std::pair<int, int>> ar0231_register_lut;
@@ -107,6 +110,7 @@ public:
 class OS04C10 : public SensorInfo {
 public:
   OS04C10();
+  void ife_downscale_configure();
   std::vector<i2c_random_wr_payload> getExposureRegisters(int exposure_time, int new_exp_g, bool dc_gain_enabled) const override;
   float getExposureScore(float desired_ev, int exp_t, int exp_g_idx, float exp_gain, int gain_idx) const override;
   int getSlaveAddress(int port) const override;

@@ -49,20 +49,11 @@ AddOption('--ccflags',
           default='',
           help='pass arbitrary flags over the command line')
 
-AddOption('--snpe',
-          action='store_true',
-          help='use SNPE on PC')
-
 AddOption('--external-sconscript',
           action='store',
           metavar='FILE',
           dest='external_sconscript',
           help='add an external SConscript to the build')
-
-AddOption('--pc-thneed',
-          action='store_true',
-          dest='pc_thneed',
-          help='use thneed on pc')
 
 AddOption('--mutation',
           action='store_true',
@@ -111,7 +102,6 @@ if arch == "larch64":
   ]
 
   libpath += [
-    "#third_party/snpe/larch64",
     "#third_party/libyuv/larch64/lib",
     "/usr/lib/aarch64-linux-gnu"
   ]
@@ -149,14 +139,6 @@ else:
       "/usr/lib",
       "/usr/local/lib",
     ]
-
-    if arch == "x86_64":
-      libpath += [
-        f"#third_party/snpe/{arch}"
-      ]
-      rpath += [
-        Dir(f"#third_party/snpe/{arch}").abspath,
-      ]
 
 if GetOption('asan'):
   ccflags = ["-fsanitize=address", "-fno-omit-frame-pointer"]
@@ -201,7 +183,6 @@ env = Environment(
     "#third_party/libyuv/include",
     "#third_party/json11",
     "#third_party/linux/include",
-    "#third_party/snpe/include",
     "#third_party",
     "#msgq",
   ],
@@ -302,12 +283,7 @@ else:
   elif arch != "Darwin":
     qt_libs += ["GL"]
 qt_env['QT3DIR'] = qt_env['QTDIR']
-
-# compatibility for older SCons versions
-try:
-  qt_env.Tool('qt3')
-except SCons.Errors.UserError:
-  qt_env.Tool('qt')
+qt_env.Tool('qt3')
 
 qt_env['CPPPATH'] += qt_dirs + ["#third_party/qrcode"]
 qt_flags = [
@@ -354,7 +330,7 @@ SConscript(['opendbc_repo/SConscript'], exports={'env': env_swaglog})
 SConscript(['cereal/SConscript'])
 
 Import('socketmaster', 'msgq')
-messaging = [socketmaster, msgq, 'zmq', 'capnp', 'kj',]
+messaging = [socketmaster, msgq, 'capnp', 'kj',]
 Export('messaging')
 
 
@@ -366,14 +342,12 @@ SConscript(['rednose/SConscript'])
 
 # Build system services
 SConscript([
-  'system/ui/SConscript',
   'system/proclogd/SConscript',
   'system/ubloxd/SConscript',
   'system/loggerd/SConscript',
 ])
 if arch != "Darwin":
   SConscript([
-    'system/sensord/SConscript',
     'system/logcatd/SConscript',
   ])
 

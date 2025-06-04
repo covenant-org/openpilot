@@ -48,6 +48,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     preEnableStandstill @12;  # added during pre-enable state with brake
     gasPressedOverride @13;  # added when user is pressing gas with no disengage on gas
     steerOverride @14;
+    steerDisengage @94;  # exits active state
     cruiseDisabled @15;
     speedTooLow @16;
     outOfSpace @17;
@@ -59,6 +60,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     pcmEnable @23;
     pcmDisable @24;
     radarFault @25;
+    radarTempUnavailable @93;
     brakeHold @26;
     parkBrake @27;
     manualRestart @28;
@@ -125,6 +127,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     espActive @90;
     personalityChanged @91;
     aeb @92;
+    userFlag @95;
 
     soundsUnavailableDEPRECATED @47;
   }
@@ -150,6 +153,10 @@ struct InitData {
   gitCommitDate @21 :Text;
   gitBranch @11 :Text;
   gitRemote @13 :Text;
+
+  # this is source commit for prebuilt branches
+  gitSrcCommit @23 :Text;
+  gitSrcCommitDate @24 :Text;
 
   androidProperties @16 :Map(Text, Text);
 
@@ -409,6 +416,7 @@ struct GpsLocationData {
   speedAccuracy @12 :Float32;
 
   hasFix @13 :Bool;
+  satelliteCount @14 :Int8;
 
   enum SensorSource {
     android @0;
@@ -482,6 +490,7 @@ struct DeviceState @0xa4d8b5af2aa492eb {
   # device thermals
   cpuTempC @26 :List(Float32);
   gpuTempC @27 :List(Float32);
+  dspTempC @49 :Float32;
   memoryTempC @28 :Float32;
   nvmeTempC @35 :List(Float32);
   modemTempC @36 :List(Float32);
@@ -723,7 +732,7 @@ struct PeripheralState {
 struct RadarState @0x9a185389d6fdd05f {
   mdMonoTime @6 :UInt64;
   carStateMonoTime @11 :UInt64;
-  radarErrors @12 :List(Car.RadarData.Error);
+  radarErrors @13 :Car.RadarData.Error;
 
   leadOne @3 :LeadData;
   leadTwo @4 :LeadData;
@@ -757,6 +766,7 @@ struct RadarState @0x9a185389d6fdd05f {
   calPercDEPRECATED @9 :Int8;
   canMonoTimesDEPRECATED @10 :List(UInt64);
   cumLagMsDEPRECATED @5 :Float32;
+  radarErrorsDEPRECATED @12 :List(Car.RadarData.ErrorDEPRECATED);
 }
 
 struct LiveCalibrationData {
@@ -1167,6 +1177,8 @@ struct ModelDataV2 {
 
   struct Action {
     desiredCurvature @0 :Float32;
+    desiredAcceleration @1 :Float32;
+    shouldStop @2 :Bool;
   }
 }
 
@@ -1579,6 +1591,10 @@ struct UbloxGnss {
       svId @0 :UInt8;
       gnssId @1 :UInt8;
       flagsBitfield @2 :UInt32;
+      cno @3 :UInt8;
+      elevationDeg @4 :Int8;
+      azimuthDeg @5 :Int16;
+      pseudorangeResidual @6 :Float32;
     }
   }
 
@@ -2237,6 +2253,11 @@ struct LiveParametersData {
   roll @14 :Float32;
   debugFilterState @16 :FilterState;
 
+  angleOffsetValid @17 :Bool = true;
+  angleOffsetAverageValid @18 :Bool = true;
+  steerRatioValid @19 :Bool = true;
+  stiffnessFactorValid @20 :Bool = true;
+
   yawRateDEPRECATED @7 :Float32;
   filterStateDEPRECATED @15 :LiveLocationKalman.Measurement;
 
@@ -2260,6 +2281,22 @@ struct LiveTorqueParametersData {
   points @10 :List(List(Float32));
   version @11 :Int32;
   useParams @12 :Bool;
+}
+
+struct LiveDelayData {
+  lateralDelay @0 :Float32;
+  validBlocks @1 :Int32;
+  status @2 :Status;
+
+  lateralDelayEstimate @3 :Float32;
+  lateralDelayEstimateStd @5 :Float32;
+  points @4 :List(Float32);
+
+  enum Status {
+    unestimated @0;
+    estimated @1;
+    invalid @2;
+  }
 }
 
 struct LiveMapDataDEPRECATED {
@@ -2440,6 +2477,14 @@ struct Microphone {
   filteredSoundPressureWeightedDb @2 :Float32;
 }
 
+struct Touch {
+  sec @0 :Int64;
+  usec @1 :Int64;
+  type @2 :UInt8;
+  code @3 :Int32;
+  value @4 :Int32;
+}
+
 struct Event {
   logMonoTime @0 :UInt64;  # nanoseconds
   valid @67 :Bool = true;
@@ -2484,6 +2529,7 @@ struct Event {
     gnssMeasurements @91 :GnssMeasurements;
     liveParameters @61 :LiveParametersData;
     liveTorqueParameters @94 :LiveTorqueParametersData;
+    liveDelay @146 : LiveDelayData;
     cameraOdometry @63 :CameraOdometry;
     thumbnail @66: Thumbnail;
     onroadEvents @134: List(OnroadEvent);
@@ -2520,6 +2566,9 @@ struct Event {
     logMessage @18 :Text;
     errorLogMessage @85 :Text;
 
+    # touch frame
+    touch @135 :List(Touch);
+
     # navigation
     navInstruction @82 :NavInstruction;
     navRoute @83 :NavRoute;
@@ -2542,11 +2591,17 @@ struct Event {
     livestreamWideRoadEncodeData @121 :EncodeData;
     livestreamDriverEncodeData @122 :EncodeData;
 
+    # *********** Custom: reserved for forks ***********
+
+    # DO change the name of the field
+    # DON'T change anything after the "@"
     customReservedRawData0 @124 :Data;
     customReservedRawData1 @125 :Data;
     customReservedRawData2 @126 :Data;
 
-    # *********** Custom: reserved for forks ***********
+    # DO change the name of the field and struct
+    # DON'T change the ID (e.g. @107)
+    # DON'T change which struct it points to
     customReserved0 @107 :Custom.CustomReserved0;
     customReserved1 @108 :Custom.CustomReserved1;
     customReserved2 @109 :Custom.CustomReserved2;
@@ -2557,6 +2612,16 @@ struct Event {
     customReserved7 @114 :Custom.CustomReserved7;
     customReserved8 @115 :Custom.CustomReserved8;
     customReserved9 @116 :Custom.CustomReserved9;
+    customReserved10 @136 :Custom.CustomReserved10;
+    customReserved11 @137 :Custom.CustomReserved11;
+    customReserved12 @138 :Custom.CustomReserved12;
+    customReserved13 @139 :Custom.CustomReserved13;
+    customReserved14 @140 :Custom.CustomReserved14;
+    customReserved15 @141 :Custom.CustomReserved15;
+    customReserved16 @142 :Custom.CustomReserved16;
+    customReserved17 @143 :Custom.CustomReserved17;
+    customReserved18 @144 :Custom.CustomReserved18;
+    customReserved19 @145 :Custom.CustomReserved19;
 
     # *********** legacy + deprecated ***********
     model @9 :Legacy.ModelData; # TODO: rename modelV2 and mark this as deprecated

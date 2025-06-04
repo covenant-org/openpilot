@@ -14,10 +14,9 @@ import sys
 import tempfile
 import threading
 import time
-import zstandard as zstd
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
-from functools import partial
+from functools import partial, total_ordering
 from queue import Queue
 from typing import cast
 from collections.abc import Callable
@@ -31,11 +30,10 @@ import cereal.messaging as messaging
 from cereal import log
 from cereal.services import SERVICE_LIST
 from openpilot.common.api import Api
-from openpilot.common.file_helpers import CallbackReader
+from openpilot.common.file_helpers import CallbackReader, get_upload_stream
 from openpilot.common.params import Params
 from openpilot.common.realtime import set_core_affinity
 from openpilot.system.hardware import HARDWARE, PC
-from openpilot.system.loggerd.uploader import LOG_COMPRESSION_LEVEL
 from openpilot.system.loggerd.xattr_cache import getxattr, setxattr
 from openpilot.common.swaglog import cloudlog
 from openpilot.system.version import get_build_metadata
@@ -55,6 +53,7 @@ MAX_RETRY_COUNT = 30  # Try for at most 5 minutes if upload fails immediately
 MAX_AGE = 31 * 24 * 3600  # seconds
 WS_FRAME_SIZE = 4096
 DEVICE_STATE_UPDATE_INTERVAL = 1.0  # in seconds
+DEFAULT_UPLOAD_PRIORITY = 99  # higher number = lower priority
 
 NetworkType = log.DeviceState.NetworkType
 
@@ -70,13 +69,15 @@ class UploadFile:
   url: str
   headers: dict[str, str]
   allow_cellular: bool
+  priority: int = DEFAULT_UPLOAD_PRIORITY
 
   @classmethod
   def from_dict(cls, d: dict) -> UploadFile:
-    return cls(d.get("fn", ""), d.get("url", ""), d.get("headers", {}), d.get("allow_cellular", False))
+    return cls(d.get("fn", ""), d.get("url", ""), d.get("headers", {}), d.get("allow_cellular", False), d.get("priority", DEFAULT_UPLOAD_PRIORITY))
 
 
 @dataclass
+@total_ordering
 class UploadItem:
   path: str
   url: str
@@ -87,22 +88,33 @@ class UploadItem:
   current: bool = False
   progress: float = 0
   allow_cellular: bool = False
+  priority: int = DEFAULT_UPLOAD_PRIORITY
 
   @classmethod
   def from_dict(cls, d: dict) -> UploadItem:
     return cls(d["path"], d["url"], d["headers"], d["created_at"], d["id"], d["retry_count"], d["current"],
-               d["progress"], d["allow_cellular"])
+               d["progress"], d["allow_cellular"], d["priority"])
+
+  def __lt__(self, other):
+    if not isinstance(other, UploadItem):
+      return NotImplemented
+    return self.priority < other.priority
+
+  def __eq__(self, other):
+    if not isinstance(other, UploadItem):
+      return NotImplemented
+    return self.priority == other.priority
 
 
 dispatcher["echo"] = lambda s: s
 recv_queue: Queue[str] = queue.Queue()
 send_queue: Queue[str] = queue.Queue()
-upload_queue: Queue[UploadItem] = queue.Queue()
+upload_queue: Queue[UploadItem] = queue.PriorityQueue()
 low_priority_send_queue: Queue[str] = queue.Queue()
 log_recv_queue: Queue[str] = queue.Queue()
+cancelled_uploads: set[str] = set()
 
 cur_upload_items: dict[int, UploadItem | None] = {}
-cur_upload_items_lock = threading.Lock()
 
 
 def strip_zst_extension(fn: str) -> str:
@@ -130,9 +142,8 @@ class UploadQueueCache:
   @staticmethod
   def cache(upload_queue: Queue[UploadItem]) -> None:
     try:
-      with upload_queue.mutex:
-        items = [asdict(item) for item in upload_queue.queue]
-
+      queue: list[UploadItem | None] = list(upload_queue.queue)
+      items = [asdict(i) for i in queue if i is not None and (i.id not in cancelled_uploads)]
       Params().put("AthenadUploadQueue", json.dumps(items))
     except Exception:
       cloudlog.exception("athena.UploadQueueCache.cache.exception")
@@ -146,6 +157,9 @@ def handle_long_poll(ws: WebSocket, exit_event: threading.Event | None) -> None:
     threading.Thread(target=ws_recv, args=(ws, end_event), name='ws_recv'),
     threading.Thread(target=ws_send, args=(ws, end_event), name='ws_send'),
     threading.Thread(target=upload_handler, args=(end_event,), name='upload_handler'),
+    threading.Thread(target=upload_handler, args=(end_event,), name='upload_handler2'),
+    threading.Thread(target=upload_handler, args=(end_event,), name='upload_handler3'),
+    threading.Thread(target=upload_handler, args=(end_event,), name='upload_handler4'),
     threading.Thread(target=log_handler, args=(end_event,), name='log_handler'),
     threading.Thread(target=stat_handler, args=(end_event,), name='stat_handler'),
   ] + [
@@ -199,12 +213,10 @@ def retry_upload(tid: int, end_event: threading.Event, increase_count: bool = Tr
       progress=0,
       current=False
     )
-
-    with cur_upload_items_lock:
-      upload_queue.put_nowait(item)
-      cur_upload_items[tid] = None
-
+    upload_queue.put_nowait(item)
     UploadQueueCache.cache(upload_queue)
+
+    cur_upload_items[tid] = None
 
     for _ in range(RETRY_DELAY):
       time.sleep(1)
@@ -224,8 +236,7 @@ def cb(sm, item, tid, end_event: threading.Event, sz: int, cur: int) -> None:
   if end_event.is_set():
     raise AbortTransferException
 
-  with cur_upload_items_lock:
-    cur_upload_items[tid] = replace(item, progress=cur / sz if sz else 1)
+  cur_upload_items[tid] = replace(item, progress=cur / sz if sz else 1)
 
 
 def upload_handler(end_event: threading.Event) -> None:
@@ -233,10 +244,14 @@ def upload_handler(end_event: threading.Event) -> None:
   tid = threading.get_ident()
 
   while not end_event.is_set():
+    cur_upload_items[tid] = None
+
     try:
-      with cur_upload_items_lock:
-        cur_upload_items[tid] = None
-        cur_upload_items[tid] = item = replace(upload_queue.get(timeout=1), current=True)
+      cur_upload_items[tid] = item = replace(upload_queue.get(timeout=1), current=True)
+
+      if item.id in cancelled_uploads:
+        cancelled_uploads.remove(item.id)
+        continue
 
       # Remove item if too old
       age = datetime.now() - datetime.fromtimestamp(item.created_at / 1000)
@@ -291,17 +306,17 @@ def _do_upload(upload_item: UploadItem, callback: Callable = None) -> requests.R
     path = strip_zst_extension(path)
     compress = True
 
-  with open(path, "rb") as f:
-    content = f.read()
-    if compress:
-      cloudlog.event("athena.upload_handler.compress", fn=path, fn_orig=upload_item.path)
-      content = zstd.compress(content, LOG_COMPRESSION_LEVEL)
-
-  with io.BytesIO(content) as data:
-    return requests.put(upload_item.url,
-                        data=CallbackReader(data, callback, len(content)) if callback else data,
-                        headers={**upload_item.headers, 'Content-Length': str(len(content))},
-                        timeout=30)
+  stream = None
+  try:
+    stream, content_length = get_upload_stream(path, compress)
+    response = requests.put(upload_item.url,
+                            data=CallbackReader(stream, callback, content_length) if callback else stream,
+                            headers={**upload_item.headers, 'Content-Length': str(content_length)},
+                            timeout=30)
+    return response
+  finally:
+    if stream:
+      stream.close()
 
 
 # security: user should be able to request any message from their car
@@ -397,6 +412,7 @@ def uploadFilesToUrls(files_data: list[UploadFileDict]) -> UploadFilesToUrlRespo
       created_at=int(time.time() * 1000),
       id=None,
       allow_cellular=file.allow_cellular,
+      priority=file.priority,
     )
     upload_id = hashlib.sha1(str(item).encode()).hexdigest()
     item = replace(item, id=upload_id)
@@ -415,10 +431,8 @@ def uploadFilesToUrls(files_data: list[UploadFileDict]) -> UploadFilesToUrlRespo
 
 @dispatcher.add_method
 def listUploadQueue() -> list[UploadItemDict]:
-  with cur_upload_items_lock, upload_queue.mutex:
-    items = list(upload_queue.queue) + [item for item in cur_upload_items.values() if item is not None]
-
-  return [asdict(item) for item in items]
+  items = list(upload_queue.queue) + list(cur_upload_items.values())
+  return [asdict(i) for i in items if (i is not None) and (i.id not in cancelled_uploads)]
 
 
 @dispatcher.add_method
@@ -426,14 +440,13 @@ def cancelUpload(upload_id: str | list[str]) -> dict[str, int | str]:
   if not isinstance(upload_id, list):
     upload_id = [upload_id]
 
-  with upload_queue.mutex:
-    remaining_items = [item for item in upload_queue.queue if item.id not in upload_id]
-    if len(remaining_items) == len(upload_queue.queue):
-      return {"success": 0, "error": "not found"}
+  uploading_ids = {item.id for item in list(upload_queue.queue)}
+  cancelled_ids = uploading_ids.intersection(upload_id)
+  if len(cancelled_ids) == 0:
+    return {"success": 0, "error": "not found"}
 
-    upload_queue.queue.clear()
-    upload_queue.queue.extend(remaining_items)
-    return {"success": 1}
+  cancelled_uploads.update(cancelled_ids)
+  return {"success": 1}
 
 @dispatcher.add_method
 def setRouteViewed(route: str) -> dict[str, int | str]:
@@ -510,7 +523,6 @@ def getSshAuthorizedKeys() -> str:
 def getGithubUsername() -> str:
   return Params().get("GithubUsername", encoding='utf8') or ''
 
-
 @dispatcher.add_method
 def getSimInfo():
   return HARDWARE.get_sim_info()
@@ -534,7 +546,7 @@ def getNetworks():
 
 @dispatcher.add_method
 def takeSnapshot() -> str | dict[str, str] | None:
-  from openpilot.system.camerad.snapshot.snapshot import jpeg_write, snapshot
+  from openpilot.system.camerad.snapshot import jpeg_write, snapshot
   ret = snapshot()
   if ret is not None:
     def b64jpeg(x):
@@ -764,8 +776,11 @@ def ws_manage(ws: WebSocket, end_event: threading.Event) -> None:
         # While not sending data, onroad, we can expect to time out in 7 + (7 * 2) = 21s
         #                         offroad, we can expect to time out in 30 + (10 * 3) = 60s
         # FIXME: TCP_USER_TIMEOUT is effectively 2x for some reason (32s), so it's mostly unused
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_USER_TIMEOUT, 16000 if onroad else 0)
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 7 if onroad else 30)
+        if sys.platform == 'linux':
+          sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_USER_TIMEOUT, 16000 if onroad else 0)
+          sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPIDLE, 7 if onroad else 30)
+        elif sys.platform == 'darwin':
+          sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPALIVE, 7 if onroad else 30)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, 7 if onroad else 10)
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPCNT, 2 if onroad else 3)
 

@@ -76,8 +76,9 @@ class TestAthenadMethods:
       self.params.put(k, v)
     self.params.put_bool("GsmMetered", True)
 
-    athenad.upload_queue = queue.Queue()
+    athenad.upload_queue = queue.PriorityQueue()
     athenad.cur_upload_items.clear()
+    athenad.cancelled_uploads.clear()
 
     for i in os.listdir(Paths.log_root()):
       p = os.path.join(Paths.log_root(), i)
@@ -137,7 +138,7 @@ class TestAthenadMethods:
     route = '2021-03-29--13-32-47'
     segments = [0, 1, 2, 3, 11]
 
-    filenames = ['qlog', 'qcamera.ts', 'rlog', 'fcamera.hevc', 'ecamera.hevc', 'dcamera.hevc']
+    filenames = ['qlog.zst', 'qcamera.ts', 'rlog.zst', 'fcamera.hevc', 'ecamera.hevc', 'dcamera.hevc']
     files = [f'{route}--{s}/{f}' for s in segments for f in filenames]
     for file in files:
       self._create_file(file)
@@ -281,10 +282,13 @@ class TestAthenadMethods:
     athenad.upload_queue.put_nowait(item)
     dispatcher["cancelUpload"](item.id)
 
+    assert item.id in athenad.cancelled_uploads
+
     self._wait_for_upload()
     time.sleep(0.1)
 
     assert athenad.upload_queue.qsize() == 0
+    assert len(athenad.cancelled_uploads) == 0
 
   @with_upload_handler
   def test_cancel_expiry(self):
@@ -317,6 +321,26 @@ class TestAthenadMethods:
     assert len(items) == 1
     assert items[0]['current']
 
+  def test_list_upload_queue_priority(self):
+    priorities = (25, 50, 99, 75, 0)
+
+    for i in priorities:
+      fn = f'qlog_{i}.zst'
+      fp = self._create_file(fn)
+      item = athenad.UploadItem(
+        path=fp,
+        url=f"http://localhost:44444/{fn}",
+        headers={},
+        created_at=int(time.time()*1000),
+        id='',
+        allow_cellular=True,
+        priority=i
+      )
+      athenad.upload_queue.put_nowait(item)
+
+    for i in sorted(priorities):
+      assert athenad.upload_queue.get_nowait().priority == i
+
   def test_list_upload_queue(self):
     item = athenad.UploadItem(path="qlog.zst", url="http://localhost:44444/qlog.zst", headers={},
                               created_at=int(time.time()*1000), id='id', allow_cellular=True)
@@ -327,7 +351,7 @@ class TestAthenadMethods:
     assert items[0] == asdict(item)
     assert not items[0]['current']
 
-    dispatcher["cancelUpload"](item.id)
+    athenad.cancelled_uploads.add(item.id)
     items = dispatcher["listUploadQueue"]()
     assert len(items) == 0
 
@@ -339,7 +363,7 @@ class TestAthenadMethods:
     athenad.upload_queue.put_nowait(item2)
 
     # Ensure canceled items are not persisted
-    dispatcher["cancelUpload"](item2.id)
+    athenad.cancelled_uploads.add(item2.id)
 
     # serialize item
     athenad.UploadQueueCache.cache(athenad.upload_queue)

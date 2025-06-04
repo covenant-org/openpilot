@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
+import fcntl
 import os
 import json
 import queue
+import struct
 import threading
 import time
 from collections import OrderedDict, namedtuple
@@ -32,6 +34,7 @@ CURRENT_TAU = 15.   # 15s time constant
 TEMP_TAU = 5.   # 5s time constant
 DISCONNECT_TIMEOUT = 5.  # wait 5 seconds before going offroad after disconnect so you get an alert
 PANDA_STATES_TIMEOUT = round(1000 / SERVICE_LIST['pandaStates'].frequency * 1.5)  # 1.5x the expected pandaState frequency
+ONROAD_CYCLE_TIME = 1  # seconds to wait offroad after requesting an onroad cycle
 
 ThermalBand = namedtuple("ThermalBand", ['min_temp', 'max_temp'])
 HardwareState = namedtuple("HardwareState", ['network_type', 'network_info', 'network_strength', 'network_stats',
@@ -58,6 +61,40 @@ def set_offroad_alert_if_changed(offroad_alert: str, show_alert: bool, extra_tex
     return
   prev_offroad_states[offroad_alert] = (show_alert, extra_text)
   set_offroad_alert(offroad_alert, show_alert, extra_text)
+
+def touch_thread(end_event):
+  count = 0
+
+  pm = messaging.PubMaster(["touch"])
+
+  event_format = "llHHi"
+  event_size = struct.calcsize(event_format)
+  event_frame = []
+
+  with open("/dev/input/by-path/platform-894000.i2c-event", "rb") as event_file:
+    fcntl.fcntl(event_file, fcntl.F_SETFL, os.O_NONBLOCK)
+    while not end_event.is_set():
+      if (count % int(1. / DT_HW)) == 0:
+        event = event_file.read(event_size)
+        if event:
+          (sec, usec, etype, code, value) = struct.unpack(event_format, event)
+          if etype != 0 or code != 0 or value != 0:
+            touch = log.Touch.new_message()
+            touch.sec = sec
+            touch.usec = usec
+            touch.type = etype
+            touch.code = code
+            touch.value = value
+            event_frame.append(touch)
+          else: # end of frame, push new log
+            msg = messaging.new_message('touch', len(event_frame), valid=True)
+            msg.touch = event_frame
+            pm.send('touch', msg)
+            event_frame = []
+          continue
+
+      count += 1
+      time.sleep(DT_HW)
 
 
 def hw_state_thread(end_event, hw_queue):
@@ -134,6 +171,7 @@ def hardware_thread(end_event, hw_queue) -> None:
 
   onroad_conditions: dict[str, bool] = {
     "ignition": False,
+    "not_onroad_cycle": True,
   }
   startup_conditions: dict[str, bool] = {}
   startup_conditions_prev: dict[str, bool] = {}
@@ -159,6 +197,7 @@ def hardware_thread(end_event, hw_queue) -> None:
   should_start_prev = False
   in_car = False
   engaged_prev = False
+  offroad_cycle_count = 0
 
   params = Params()
   power_monitor = PowerMonitoring()
@@ -174,6 +213,12 @@ def hardware_thread(end_event, hw_queue) -> None:
     pandaStates = sm['pandaStates']
     peripheralState = sm['peripheralState']
     peripheral_panda_present = peripheralState.pandaType != log.PandaState.PandaType.unknown
+
+    # handle requests to cycle system started state
+    if params.get_bool("OnroadCycleRequested"):
+      params.put_bool("OnroadCycleRequested", False)
+      offroad_cycle_count = sm.frame
+    onroad_conditions["not_onroad_cycle"] = (sm.frame - offroad_cycle_count) >= ONROAD_CYCLE_TIME * SERVICE_LIST['pandaStates'].frequency
 
     if sm.updated['pandaStates'] and len(pandaStates) > 0:
 
@@ -195,7 +240,7 @@ def hardware_thread(end_event, hw_queue) -> None:
         cloudlog.error("panda timed out onroad")
 
     # Run at 2Hz, plus either edge of ignition
-    ign_edge = (started_ts is not None) != onroad_conditions["ignition"]
+    ign_edge = (started_ts is not None) != all(onroad_conditions.values())
     if (sm.frame % round(SERVICE_LIST['pandaStates'].frequency * DT_HW) != 0) and not ign_edge:
       continue
 
@@ -419,6 +464,9 @@ def main():
     threading.Thread(target=hw_state_thread, args=(end_event, hw_queue)),
     threading.Thread(target=hardware_thread, args=(end_event, hw_queue)),
   ]
+
+  if TICI:
+    threads.append(threading.Thread(target=touch_thread, args=(end_event,)))
 
   for t in threads:
     t.start()

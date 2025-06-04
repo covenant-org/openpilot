@@ -3,15 +3,16 @@ import math
 import os
 import subprocess
 import time
-import tempfile
 from enum import IntEnum
 from functools import cached_property, lru_cache
 from pathlib import Path
 
 from cereal import log
+from openpilot.common.util import sudo_read, sudo_write
 from openpilot.common.gpio import gpio_set, gpio_init, get_irqs_for_action
-from openpilot.system.hardware.base import HardwareBase, ThermalConfig, ThermalZone
+from openpilot.system.hardware.base import HardwareBase, LPABase, ThermalConfig, ThermalZone
 from openpilot.system.hardware.tici import iwlist
+from openpilot.system.hardware.tici.esim import TiciLPA
 from openpilot.system.hardware.tici.pins import GPIO
 from openpilot.system.hardware.tici.amplifier import Amplifier
 
@@ -60,25 +61,6 @@ NetworkStrength = log.DeviceState.NetworkStrength
 MM_MODEM_ACCESS_TECHNOLOGY_UMTS = 1 << 5
 MM_MODEM_ACCESS_TECHNOLOGY_LTE = 1 << 14
 
-
-def sudo_write(val, path):
-  try:
-    with open(path, 'w') as f:
-      f.write(str(val))
-  except PermissionError:
-    os.system(f"sudo chmod a+w {path}")
-    try:
-      with open(path, 'w') as f:
-        f.write(str(val))
-    except PermissionError:
-      # fallback for debugfs files
-      os.system(f"sudo su -c 'echo {val} > {path}'")
-
-def sudo_read(path: str) -> str:
-  try:
-    return subprocess.check_output(f"sudo cat {path}", shell=True, encoding='utf8')
-  except Exception:
-    return ""
 
 def affine_irq(val, action):
   irqs = get_irqs_for_action(action)
@@ -198,6 +180,9 @@ class Tici(HardwareBase):
         'data_connected': modem.Get(MM_MODEM, 'State', dbus_interface=DBUS_PROPS, timeout=TIMEOUT) == MM_MODEM_STATE.CONNECTED,
       }
 
+  def get_sim_lpa(self) -> LPABase:
+    return TiciLPA()
+
   def get_imei(self, slot):
     if slot != 0:
       return ""
@@ -205,6 +190,8 @@ class Tici(HardwareBase):
     return str(self.get_modem().Get(MM_MODEM, 'EquipmentIdentifier', dbus_interface=DBUS_PROPS, timeout=TIMEOUT))
 
   def get_network_info(self):
+    if self.get_device_type() == "mici":
+      return None
     try:
       modem = self.get_modem()
       info = modem.Command("AT+QNWINFO", math.ceil(TIMEOUT), dbus_interface=MM_MODEM, timeout=TIMEOUT)
@@ -299,7 +286,7 @@ class Tici(HardwareBase):
     try:
       modem = self.get_modem()
       temps = modem.Command("AT+QTEMP", math.ceil(timeout), dbus_interface=MM_MODEM, timeout=timeout)
-      return list(map(int, temps.split(' ')[1].split(',')))
+      return list(filter(lambda t: t != 255, map(int, temps.split(' ')[1].split(','))))
     except Exception:
       return []
 
@@ -331,11 +318,19 @@ class Tici(HardwareBase):
     return ThermalConfig(cpu=[ThermalZone(f"cpu{i}-silver-usr") for i in range(4)] +
                              [ThermalZone(f"cpu{i}-gold-usr") for i in range(4)],
                          gpu=[ThermalZone("gpu0-usr"), ThermalZone("gpu1-usr")],
+                         dsp=ThermalZone("compute-hvx-usr"),
                          memory=ThermalZone("ddr-usr"),
                          pmic=[ThermalZone("pm8998_tz"), ThermalZone("pm8005_tz")],
                          intake=intake,
                          exhaust=exhaust,
                          case=case)
+
+  def set_display_power(self, on):
+    try:
+      with open("/sys/class/backlight/panel0-backlight/bl_power", "w") as f:
+        f.write("0" if on else "4")
+    except Exception:
+      pass
 
   def set_screen_brightness(self, percentage):
     try:
@@ -367,7 +362,7 @@ class Tici(HardwareBase):
 
     # *** CPU config ***
 
-    # offline big cluster, leave core 4 online for pandad
+    # offline big cluster
     for i in range(4, 8):
       val = '0' if powersave_enabled else '1'
       sudo_write(val, f'/sys/devices/system/cpu/cpu{i}/online')
@@ -380,13 +375,13 @@ class Tici(HardwareBase):
 
     # *** IRQ config ***
 
-    # GPU
-    affine_irq(5, "kgsl-3d0")
+    # GPU, modeld core
+    affine_irq(7, "kgsl-3d0")
 
     # camerad core
-    camera_irqs = ("cci", "cpas_camnoc", "cpas-cdm", "csid", "ife", "csid-lite", "ife-lite")
+    camera_irqs = ("a5", "cci", "cpas_camnoc", "cpas-cdm", "csid", "ife", "csid-lite", "ife-lite")
     for n in camera_irqs:
-      affine_irq(5, n)
+      affine_irq(6, n)
 
   def get_gpu_usage_percent(self):
     try:
@@ -504,18 +499,19 @@ class Tici(HardwareBase):
       except Exception:
         pass
 
-    # eSIM prime
-    if sim_id.startswith('8985235'):
-      dest = "/etc/NetworkManager/system-connections/esim.nmconnection"
-      with open(Path(__file__).parent/'esim.nmconnection') as f, tempfile.NamedTemporaryFile(mode='w') as tf:
-        dat = f.read()
-        dat = dat.replace("sim-id=", f"sim-id={sim_id}")
-        tf.write(dat)
-        tf.flush()
+    # we use the lte connection built into AGNOS. cleanup esim connection if it exists
+    dest = "/etc/NetworkManager/system-connections/esim.nmconnection"
+    if os.path.exists(dest):
+      os.system(f"sudo nmcli con delete {dest}")
+      self.reboot_modem()
 
-        # needs to be root
-        os.system(f"sudo cp {tf.name} {dest}")
-      os.system(f"sudo nmcli con load {dest}")
+  def reboot_modem(self):
+    modem = self.get_modem()
+    for state in (0, 1):
+      try:
+        modem.Command(f'AT+CFUN={state}', math.ceil(TIMEOUT), dbus_interface=MM_MODEM, timeout=TIMEOUT)
+      except Exception:
+        pass
 
   def get_networks(self):
     r = {}

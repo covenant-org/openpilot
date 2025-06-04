@@ -1,16 +1,30 @@
-Version 0.9.8 (2024-XX-XX)
+Version 0.9.9 (2025-05-23)
 ========================
 * New driving model
-  * Trained in brand new ML simulator
-  * Model now gates applying positive accel in Chill mode
-* New driving monitoring model
+  * New training architecture using parts from MLSIM
+* Steering actuation delay is now learned online
+* Ford Escape 2023-24 support thanks to incognitojam!
+* Ford Kuga 2024 support thanks to incognitojam!
+* Hyundai Nexo 2021 support thanks to sunnyhaibin!
+* Tesla Model 3 and Y support thanks to lukasloetkolben!
+* Lexus RC 2023 support thanks to nelsonjchen!
+
+Version 0.9.8 (2025-02-28)
+========================
+* New driving model
+  * Model now gates applying positive acceleration in Chill mode
+* New driver monitoring model
   * Reduced false positives related to passengers
 * Image processing pipeline moved to the ISP
-  * More GPU time for driving models
-  * Power draw reduced 0.5W, which means your device runs cooler 
+  * More GPU time for bigger driving models
+  * Power draw reduced 0.5W, which means your device runs cooler
 * Added toggle to enable driver monitoring even when openpilot is not engaged
+* Localizer rewritten to remove GPS dependency at runtime
+* Firehose Mode for maximizing your training data uploads
 * Enable openpilot longitudinal control for Ford Q3 vehicles
 * New Toyota TSS2 longitudinal tune
+* Rivian R1S and R1T support thanks to lukasloetkolben!
+* Ford F-150, F-150 Hybrid, Mach-E, and Ranger support
 
 Version 0.9.7 (2024-06-13)
 ========================

@@ -9,7 +9,6 @@ from cereal import log
 import cereal.messaging as messaging
 import openpilot.system.sentry as sentry
 from openpilot.common.params import Params, ParamKeyType
-from openpilot.common.text_window import TextWindow
 from openpilot.system.hardware import HARDWARE
 from openpilot.system.manager.helpers import unblock_stdout, write_onroad_params, save_bootlog
 from openpilot.system.manager.process import ensure_running
@@ -58,7 +57,8 @@ def manager_init() -> None:
   except PermissionError:
     print(f"WARNING: failed to make {Paths.shm_path()}")
 
-  # set version params
+  # set params
+  serial = HARDWARE.get_serial()
   params.put("Version", build_metadata.openpilot.version)
   params.put("TermsVersion", terms_version)
   params.put("TrainingVersion", training_version)
@@ -68,13 +68,13 @@ def manager_init() -> None:
   params.put("GitRemote", build_metadata.openpilot.git_origin)
   params.put_bool("IsTestedBranch", build_metadata.tested_channel)
   params.put_bool("IsReleaseBranch", build_metadata.release_channel)
+  params.put("HardwareSerial", serial)
 
   # set dongle id
   reg_res = register(show_spinner=True)
   if reg_res:
     dongle_id = reg_res
   else:
-    serial = params.get("HardwareSerial")
     raise Exception(f"Registration failed for device {serial}")
   os.environ['DONGLE_ID'] = dongle_id  # Needed for swaglog
   os.environ['GIT_ORIGIN'] = build_metadata.openpilot.git_normalized_origin # Needed for swaglog
@@ -202,6 +202,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+  from openpilot.system.ui.text import TextWindow
+
   unblock_stdout()
 
   try:

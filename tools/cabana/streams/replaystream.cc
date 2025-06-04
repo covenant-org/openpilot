@@ -7,6 +7,7 @@
 #include <QPushButton>
 
 #include "common/timing.h"
+#include "common/util.h"
 #include "tools/cabana/streams/routes.h"
 
 ReplayStream::ReplayStream(QObject *parent) : AbstractStream(parent) {
@@ -45,17 +46,20 @@ void ReplayStream::mergeSegments() {
   }
 }
 
-bool ReplayStream::loadRoute(const QString &route, const QString &data_dir, uint32_t replay_flags) {
+bool ReplayStream::loadRoute(const QString &route, const QString &data_dir, uint32_t replay_flags, bool auto_source) {
   replay.reset(new Replay(route.toStdString(), {"can", "roadEncodeIdx", "driverEncodeIdx", "wideRoadEncodeIdx", "carParams"},
-                          {}, nullptr, replay_flags, data_dir.toStdString()));
+                          {}, nullptr, replay_flags, data_dir.toStdString(), auto_source));
   replay->setSegmentCacheLimit(settings.max_cached_minutes);
   replay->installEventFilter([this](const Event *event) { return eventFilter(event); });
 
   // Forward replay callbacks to corresponding Qt signals.
   replay->onSeeking = [this](double sec) { emit seeking(sec); };
-  replay->onSeekedTo = [this](double sec) { emit seekedTo(sec); };
+  replay->onSeekedTo = [this](double sec) {
+    emit seekedTo(sec);
+    waitForSeekFinshed();
+  };
   replay->onQLogLoaded = [this](std::shared_ptr<LogReader> qlog) { emit qLogLoaded(qlog); };
-  replay->onSegmentsMerged = [this]() { QMetaObject::invokeMethod(this, &ReplayStream::mergeSegments, Qt::QueuedConnection); };
+  replay->onSegmentsMerged = [this]() { QMetaObject::invokeMethod(this, &ReplayStream::mergeSegments, Qt::BlockingQueuedConnection); };
 
   bool success = replay->load();
   if (!success) {

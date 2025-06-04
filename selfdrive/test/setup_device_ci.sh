@@ -18,6 +18,9 @@ if [ -z "$TEST_DIR" ]; then
   exit 1
 fi
 
+# prevent storage from filling up
+rm -rf /data/media/0/realdata/*
+
 rm -rf /data/safe_staging/ || true
 if [ -d /data/safe_staging/ ]; then
   sudo umount /data/safe_staging/merged/ || true
@@ -97,7 +100,7 @@ unsafe_checkout() {( set -e
   git fetch --no-tags --no-recurse-submodules -j8 --verbose --depth 1 origin $GIT_COMMIT
   git checkout --force --no-recurse-submodules $GIT_COMMIT
   git reset --hard $GIT_COMMIT
-  git clean -df
+  git clean -dff
   git submodule sync
   git submodule foreach --recursive "git reset --hard && git clean -df"
   git submodule update --init --recursive

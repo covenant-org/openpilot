@@ -63,10 +63,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Prevent large data uploads when on a metered connection</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Hidden Network</source>
         <translation type="unfinished"></translation>
     </message>
@@ -85,6 +81,30 @@
     <message>
         <source>for &quot;%1&quot;</source>
         <translation type="unfinished">için &quot;%1&quot;</translation>
+    </message>
+    <message>
+        <source>Prevent large data uploads when on a metered cellular connection</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>default</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>metered</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>unmetered</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Wi-Fi Network Metered</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Prevent large data uploads when on a metered Wi-Fi connection</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -121,6 +141,26 @@
     </message>
     <message>
         <source>Longitudinal Maneuver Mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>openpilot Longitudinal Control (Alpha)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>WARNING: openpilot longitudinal control is in alpha for this car and will disable Automatic Emergency Braking (AEB).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>On this car, openpilot defaults to the car&apos;s built-in ACC instead of openpilot&apos;s longitudinal control. Enable this to switch to openpilot longitudinal control. Enabling Experimental mode is recommended when enabling openpilot longitudinal control alpha.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable ADB</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>ADB (Android Debug Bridge) allows connecting to your device over USB or over the network. See https://docs.comma.ai/how-to/connect-to-comma for more info.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -266,6 +306,14 @@
         <source>PAIR</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Disengage to Reset Calibration</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> Resetting calibration will restart openpilot if the car is powered on.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>DriverViewWindow</name>
@@ -282,6 +330,41 @@
     </message>
     <message>
         <source>CHILL MODE ON</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>FirehosePanel</name>
+    <message>
+        <source>🔥 Firehose Mode 🔥</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>openpilot learns to drive by watching humans, like you, drive.
+
+Firehose Mode allows you to maximize your training data uploads to improve openpilot&apos;s driving models. More data means bigger models, which means better Experimental Mode.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Firehose Mode: ACTIVE</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>ACTIVE</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>For maximum effectiveness, bring your device inside and connect to a good USB-C adapter and Wi-Fi weekly.&lt;br&gt;&lt;br&gt;Firehose Mode can also work while you&apos;re driving if connected to a hotspot or unlimited SIM card.&lt;br&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;Frequently Asked Questions&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;i&gt;Does it matter how or where I drive?&lt;/i&gt; Nope, just drive as you normally would.&lt;br&gt;&lt;br&gt;&lt;i&gt;Do all of my segments get pulled in Firehose Mode?&lt;/i&gt; No, we selectively pull a subset of your segments.&lt;br&gt;&lt;br&gt;&lt;i&gt;What&apos;s a good USB-C adapter?&lt;/i&gt; Any fast phone or laptop charger should be fine.&lt;br&gt;&lt;br&gt;&lt;i&gt;Does it matter which software I run?&lt;/i&gt; Yes, only upstream openpilot (and particular forks) are able to be used for training.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <source>&lt;b&gt;%n segment(s)&lt;/b&gt; of your driving is in the training dataset so far.</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <source>&lt;span stylesheet=&apos;font-size: 60px; font-weight: bold; color: #e74c3c;&apos;&gt;INACTIVE&lt;/span&gt;: connect to an unmetered network</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -311,13 +394,6 @@
         <translation>
             <numerusform>En az %n karakter gerekli!</numerusform>
         </translation>
-    </message>
-</context>
-<context>
-    <name>Installer</name>
-    <message>
-        <source>Installing...</source>
-        <translation>Yükleniyor...</translation>
     </message>
 </context>
 <context>
@@ -454,6 +530,10 @@
         <source>Bookmark connect.comma.ai to your home screen to use it like an app</source>
         <translation>Uygulama gibi kullanmak için connect.comma.ai sitesini yer işaretlerine ekleyin.</translation>
     </message>
+    <message>
+        <source>Please connect to Wi-Fi to complete initial pairing</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>ParamControl</name>
@@ -510,14 +590,6 @@
 </context>
 <context>
     <name>QObject</name>
-    <message>
-        <source>Reboot</source>
-        <translation>Yeniden başlat</translation>
-    </message>
-    <message>
-        <source>Exit</source>
-        <translation>Çık</translation>
-    </message>
     <message>
         <source>openpilot</source>
         <translation>openpilot</translation>
@@ -609,6 +681,10 @@ This may take up to a minute.</source>
     </message>
     <message>
         <source>Developer</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Firehose</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -921,20 +997,20 @@ This may take up to a minute.</source>
 <context>
     <name>TermsPage</name>
     <message>
-        <source>Terms &amp; Conditions</source>
-        <translation>Şartlar ve Koşullar</translation>
-    </message>
-    <message>
         <source>Decline</source>
         <translation>Reddet</translation>
     </message>
     <message>
-        <source>Scroll to accept</source>
-        <translation>Kabul etmek için kaydırın</translation>
-    </message>
-    <message>
         <source>Agree</source>
         <translation>Kabul et</translation>
+    </message>
+    <message>
+        <source>Welcome to openpilot</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>You must accept the Terms and Conditions to use openpilot. Read the latest terms at &lt;span style=&apos;color: #465BEA;&apos;&gt;https://comma.ai/terms&lt;/span&gt; before continuing.</source>
+        <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
@@ -942,10 +1018,6 @@ This may take up to a minute.</source>
     <message>
         <source>Enable openpilot</source>
         <translation>openpilot&apos;u aktifleştir</translation>
-    </message>
-    <message>
-        <source>Use the openpilot system for adaptive cruise control and lane keep driver assistance. Your attention is required at all times to use this feature. Changing this setting takes effect when the car is powered off.</source>
-        <translation>Ayarlanabilir hız sabitleyici ve şeritte kalma yardımı için openpilot sistemini kullanın. Bu özelliği kullanırken her zaman dikkatli olmanız gerekiyor. Bu ayarın değiştirilmesi için araç kapatılıp açılması gerekiyor.</translation>
     </message>
     <message>
         <source>Enable Lane Departure Warnings</source>
@@ -976,14 +1048,6 @@ This may take up to a minute.</source>
         <translation>Aktifleştirilirse eğer gaz pedalına basınca openpilot devre dışı kalır.</translation>
     </message>
     <message>
-        <source>openpilot Longitudinal Control (Alpha)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>WARNING: openpilot longitudinal control is in alpha for this car and will disable Automatic Emergency Braking (AEB).</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Experimental Mode</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1005,10 +1069,6 @@ This may take up to a minute.</source>
     </message>
     <message>
         <source>Driving Personality</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>On this car, openpilot defaults to the car&apos;s built-in ACC instead of openpilot&apos;s longitudinal control. Enable this to switch to openpilot longitudinal control. Enabling Experimental mode is recommended when enabling openpilot longitudinal control alpha.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1059,6 +1119,14 @@ This may take up to a minute.</source>
         <source>Enable driver monitoring even when openpilot is not engaged.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <source>Use the openpilot system for adaptive cruise control and lane keep driver assistance. Your attention is required at all times to use this feature.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source> Changing this setting will restart openpilot if the car is powered on.</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>Updater</name>
@@ -1098,23 +1166,15 @@ This may take up to a minute.</source>
 <context>
     <name>WiFiPromptWidget</name>
     <message>
-        <source>Setup Wi-Fi</source>
+        <source>Open</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Connect to Wi-Fi to upload driving data and help improve openpilot</source>
+        <source>Maximize your training data uploads to improve openpilot&apos;s driving models.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <source>Open Settings</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Ready to upload</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Training data will be pulled periodically while your device is on Wi-Fi</source>
+        <source>&lt;span style=&apos;font-family: &quot;Noto Color Emoji&quot;;&apos;&gt;🔥&lt;/span&gt; Firehose Mode &lt;span style=&apos;font-family: Noto Color Emoji;&apos;&gt;🔥&lt;/span&gt;</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
