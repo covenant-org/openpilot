@@ -110,3 +110,4 @@ tools/sim/bridge/gz/mavlink/CMakeCache.txt
 tools/sim/bridge/gz/mavlink/Makefile
 tools/sim/bridge/gz/mavlink/cmake_install.cmake
 Session.vim
+Session*
