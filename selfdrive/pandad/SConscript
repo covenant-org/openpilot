@@ -8,8 +8,8 @@ envCython.Append(LIBPATH=['/data/MAVSDK/install/lib'])
 libs = ['usb-1.0', common, messaging, 'pthread']
 panda = env.Library('panda', ['panda.cc', 'panda_comms.cc', 'spi.cc'], CXXFLAGS='-std=c++17')
 
-env.Program('pandad', ['main.cc', 'pandad.cc'], LIBS=[panda, 'mavsdk'] + libs, CXXFLAGS='-std=c++17')
-env.Program('fakepanda', ['fakepanda.cc'], LIBS=libs)
+env.Program('pandad', ['main.cc', 'pandad.cc', 'panda_safety.cc'], LIBS=[panda, 'mavsdk'] + libs, CXXFLAGS='-std=c++17')
+#env.Program('fakepanda', ['fakepanda.cc'], LIBS=libs)
 env.Library('libcan_list_to_can_capnp', ['can_list_to_can_capnp.cc'])
 
 pandad_python = envCython.Program('pandad_api_impl.so', 'pandad_api_impl.pyx', LIBS=["can_list_to_can_capnp", 'capnp', 'kj'] + envCython["LIBS"])

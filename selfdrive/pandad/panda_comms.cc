@@ -618,7 +618,6 @@ bool unpack_can_buffer(uint8_t *data, uint32_t &size,
     }
 
     can_frame &canData = out_vec.emplace_back();
-    canData.busTime = 0;
     canData.address = header.addr;
     canData.src = header.bus;
     if (header.rejected) {

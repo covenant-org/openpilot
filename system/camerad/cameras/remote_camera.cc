@@ -122,9 +122,9 @@ void RemoteCamera::fetch_frame_thread() {
 void RemoteCamera::init() {
   assert(this->vipc_server != nullptr);
   this->vipc_server->create_buffers(VisionStreamType::VISION_STREAM_ROAD, 5,
-                                    false, this->width, this->height);
+                                     this->width, this->height);
   this->vipc_server->create_buffers(VisionStreamType::VISION_STREAM_WIDE_ROAD, 5,
-                                  false, this->width, this->height);
+                                   this->width, this->height);
   this->vipc_server->start_listener();
   this->pm = new PubMaster({"roadCameraState","wideRoadCameraState"});
 }

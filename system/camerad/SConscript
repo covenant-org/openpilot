@@ -9,7 +9,7 @@ if arch != "Darwin":
   env.Append(CPPPATH=['/data/zlib-1.3.1/install/include'])
   env.Append(LIBPATH=['/data/zlib-1.3.1/install/lib'])
 
-  env.Program('camerad', ['main.cc', camera_obj], LIBS=libs + ['z'])
+  env.Program('camerad', ['main.cc', camera_obj], LIBS=libs + ['z', 'pthread'])
 
 if GetOption("extras") and arch == "x86_64":
   env.Program('test/test_ae_gray', ['test/test_ae_gray.cc', camera_obj], LIBS=libs)

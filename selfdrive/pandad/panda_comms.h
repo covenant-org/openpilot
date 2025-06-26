@@ -94,7 +94,7 @@ public:
                  unsigned int timeout = TIMEOUT);
   int bulk_read(unsigned char endpoint, unsigned char *data, int length,
                 unsigned int timeout = TIMEOUT);
-  void cleanup(){};
+  void cleanup();
 
   static std::vector<std::string> list();
 
