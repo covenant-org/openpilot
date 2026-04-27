@@ -490,6 +490,14 @@ class Tici(HardwareBase):
           'AT$QCPCFG=usbNet,1',
         ]
 
+        if sim_id and sim_id.startswith("895202"):
+          cmds += [
+            # 1. Set APN, Username, Password, and Auth Type (3 = PAP/CHAP)
+            'AT+QICSGP=1,1,"internet.itelcel.com","webgprs","webgprs2002",3',
+            # 2. Start the data call and route it to the ECM USB interface
+            'AT+QNETDEVCTL=1,1,1'
+          ]
+
     for cmd in cmds:
       try:
         modem.Command(cmd, math.ceil(TIMEOUT), dbus_interface=MM_MODEM, timeout=TIMEOUT)
@@ -508,6 +516,36 @@ class Tici(HardwareBase):
         # needs to be root
         os.system(f"sudo cp {tf.name} {dest}")
       os.system(f"sudo nmcli con load {dest}")
+
+    telcel_dest = "/etc/NetworkManager/system-connections/telcel.nmconnection"
+    if sim_id and sim_id.startswith("895202") and not os.path.exists(telcel_dest):
+      # We create a native NetworkManager profile that forces the metric to 700 (Fallback priority).
+      telcel_nm_profile = """[connection]
+id=Telcel_Data
+type=ethernet
+interface-name=usb0
+autoconnect=true
+
+[ethernet]
+auto-negotiate=true
+
+[ipv4]
+method=auto
+route-metric=700
+
+[ipv6]
+method=auto
+route-metric=700
+"""
+      with tempfile.NamedTemporaryFile(mode='w', delete=False) as tf:
+        tf.write(telcel_nm_profile)
+        tf_name = tf.name
+
+      # Move it to the system-connections folder, set strict permissions, and load it via nmcli
+      os.system(f"sudo mv {tf_name} {telcel_dest}")
+      os.system(f"sudo chmod 600 {telcel_dest}")
+      os.system(f"sudo nmcli con load {telcel_dest}")
+      os.system(f"sudo nmcli con up Telcel_Data 2>/dev/null || true")
 
   def reboot_modem(self):
     modem = self.get_modem()
