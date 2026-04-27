@@ -494,8 +494,6 @@ class Tici(HardwareBase):
           cmds += [
             # 1. Set APN, Username, Password, and Auth Type (3 = PAP/CHAP)
             'AT+QICSGP=1,1,"internet.itelcel.com","webgprs","webgprs2002",3',
-            # 2. Start the data call and route it to the ECM USB interface
-            'AT+QNETDEVCTL=1,1,1'
           ]
 
     for cmd in cmds:
@@ -519,6 +517,12 @@ class Tici(HardwareBase):
 
     telcel_dest = "/etc/NetworkManager/system-connections/telcel.nmconnection"
     if sim_id and sim_id.startswith("895202") and not os.path.exists(telcel_dest):
+      # Force the kernel to bind the driver (Runs on EVERY boot)
+      os.system("echo '1-1:1.4' | sudo tee /sys/bus/usb/drivers/cdc_ether/bind >/dev/null 2>&1 || true")
+      # Give the kernel 1 second to mount the usb0 interface
+      os.system("sleep 1")
+      # Force the data connection to start via OS-level mmcli to bypass silent D-Bus failures
+      os.system("sudo mmcli -m 0 --command='AT+QNETDEVCTL=1,1,1' 2>/dev/null || true")
       # We create a native NetworkManager profile that forces the metric to 700 (Fallback priority).
       telcel_nm_profile = """[connection]
 id=Telcel_Data
