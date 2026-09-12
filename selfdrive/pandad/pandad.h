@@ -10,7 +10,9 @@ void pandad_main_thread(std::string serial);
 class PandaSafety {
 public:
   PandaSafety(Panda *panda) : panda_(panda) {}
-  void configureSafetyMode(bool is_onroad);
+  // obd_capture: covenant read-only J1939 capture — route the OBD bus via ELM327
+  // multiplexing even when not onroad (see pandad.cc). Never transmits.
+  void configureSafetyMode(bool is_onroad, bool obd_capture = false);
 
 private:
   void updateMultiplexingMode();

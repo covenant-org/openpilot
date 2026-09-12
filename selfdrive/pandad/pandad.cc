@@ -161,7 +161,7 @@ void fill_panda_can_state(cereal::PandaState::PandaCanState::Builder &cs, const 
   cs.setCanCoreResetCnt(can_health.can_core_reset_cnt);
 }
 
-std::optional<bool> send_panda_states(PubMaster *pm, Panda *panda, bool is_onroad, bool spoofing_started) {
+std::optional<bool> send_panda_states(PubMaster *pm, Panda *panda, bool is_onroad, bool spoofing_started, bool obd_capture) {
   // build msg
   MessageBuilder msg;
   auto evt = msg.initEvent();
@@ -194,13 +194,17 @@ std::optional<bool> send_panda_states(PubMaster *pm, Panda *panda, bool is_onroa
     panda->set_safety_model(cereal::CarParams::SafetyModel::NO_OUTPUT);
   }
 
-  bool power_save_desired = !ignition_local;
+  // Keep the panda awake during read-only OBD capture so it actively receives
+  // the truck's J1939 bus even with ignition off.
+  bool power_save_desired = !ignition_local && !obd_capture;
   if (health.power_save_enabled_pkt != power_save_desired) {
     panda->set_power_saving(power_save_desired);
   }
 
-  // set safety mode to NO_OUTPUT when car is off or we're not onroad. ELM327 is an alternative if we want to leverage athenad/connect
-  bool should_close_relay = !ignition_local || !is_onroad;
+  // set safety mode to NO_OUTPUT when car is off or we're not onroad. ELM327 is an alternative if we want to leverage athenad/connect.
+  // During OBD capture we intentionally keep the ELM327 read-only multiplexing model (set in PandaSafety) instead of forcing NO_OUTPUT,
+  // otherwise the OBD-II bus routing is torn down and can_recorder sees nothing.
+  bool should_close_relay = (!ignition_local || !is_onroad) && !obd_capture;
   if (should_close_relay && (health.safety_mode_pkt != (uint8_t)(cereal::CarParams::SafetyModel::NO_OUTPUT))) {
     panda->set_safety_model(cereal::CarParams::SafetyModel::NO_OUTPUT);
   }
@@ -267,8 +271,8 @@ void send_peripheral_state(Panda *panda, PubMaster *pm) {
   pm->send("peripheralState", msg);
 }
 
-void process_panda_state(Panda *panda, PubMaster *pm, bool engaged, bool is_onroad, bool spoofing_started) {
-  auto ignition_opt = send_panda_states(pm, panda, is_onroad, spoofing_started);
+void process_panda_state(Panda *panda, PubMaster *pm, bool engaged, bool is_onroad, bool spoofing_started, bool obd_capture) {
+  auto ignition_opt = send_panda_states(pm, panda, is_onroad, spoofing_started, obd_capture);
   if (!ignition_opt) {
     LOGE("Failed to get ignition_opt");
     return;
@@ -379,8 +383,12 @@ void pandad_run(Panda *panda) {
       sm.update(0);
       engaged = sm.allAliveAndValid({"selfdriveState"}) && sm["selfdriveState"].getSelfdriveState().getEnabled();
       is_onroad = params.getBool("IsOnroad");
-      process_panda_state(panda, &pm, engaged, is_onroad, spoofing_started);
-      panda_safety.configureSafetyMode(is_onroad);
+      // Covenant read-only OBD capture: when offroad and can_recorder has
+      // requested OBD multiplexing, route the truck's J1939 bus so it reaches
+      // the `can` stream without waiting for an ignition/onroad transition.
+      bool obd_capture = !is_onroad && params.getBool("ObdMultiplexingEnabled");
+      process_panda_state(panda, &pm, engaged, is_onroad, spoofing_started, obd_capture);
+      panda_safety.configureSafetyMode(is_onroad, obd_capture);
     }
 
     // Send out peripheralState at 2Hz

@@ -2,7 +2,7 @@
 #include "cereal/messaging/messaging.h"
 #include "common/swaglog.h"
 
-void PandaSafety::configureSafetyMode(bool is_onroad) {
+void PandaSafety::configureSafetyMode(bool is_onroad, bool obd_capture) {
   if (is_onroad && !safety_configured_) {
     updateMultiplexingMode();
 
@@ -12,6 +12,12 @@ void PandaSafety::configureSafetyMode(bool is_onroad) {
       setSafetyMode(car_params);
       safety_configured_ = true;
     }
+  } else if (!is_onroad && obd_capture) {
+    // Covenant read-only OBD capture: keep ELM327 + OBD multiplexing on so the
+    // truck's J1939 diagnostic bus (pins 6/14) reaches the `can` stream while
+    // the comma stays offroad and camerad/streaming keep running. ELM327 is a
+    // passive diagnostic model — it never transmits control frames.
+    updateMultiplexingMode();
   } else if (!is_onroad) {
     initialized_ = false;
     safety_configured_ = false;
