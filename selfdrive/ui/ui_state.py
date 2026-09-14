@@ -98,10 +98,10 @@ class UIState:
     return self.started and self.sm["selfdriveState"].enabled
 
   def is_onroad(self) -> bool:
-    return self.started
+    return True
 
   def is_offroad(self) -> bool:
-    return not self.started
+    return True
 
   def update(self) -> None:
     self.prime_state.start()  # start thread after manager forks ui

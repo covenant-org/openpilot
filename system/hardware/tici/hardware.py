@@ -274,6 +274,24 @@ class Tici(HardwareBase):
     return network_strength
 
   def get_network_metered(self, network_type) -> bool:
+    # An explicit NM_METERED_YES is honoured for EVERY network_type, not just
+    # wifi and cell. Our LTE modem is a USB ECM/NCM device, so NetworkManager
+    # presents it as '802-3-ethernet' and get_network_type() above returns
+    # NetworkType.ethernet. Upstream only consults the Metered property for wifi
+    # and cell*, so on this hardware the SIM fell through both branches to
+    # super(), which answers False for ethernet — NM's `Metered: yes` was read
+    # over D-Bus and then thrown away.
+    #
+    # The cost of that was not theoretical: with NetworkMetered=False, athenad
+    # and loggerd's uploader treated the Telcel SIM as free and pushed ~4 GB a
+    # month against a 3.5 GB plan (measured 2026-08-04: athenad alone sustained
+    # 1.59 KB/s outbound while the truck was parked, with 7.6 GB of realdata
+    # queued). updated.py gates OTA fetches on the same param.
+    #
+    # Checking YES first also keeps the ordering safe: a device that is
+    # genuinely unmetered never reports NM_METERED_YES, so nothing that used to
+    # answer False starts answering True unless NM says so outright. The
+    # cell-specific NO branch is preserved below for the unmetered-SIM case.
     try:
       primary_connection = self.nm.Get(NM, 'PrimaryConnection', dbus_interface=DBUS_PROPS, timeout=TIMEOUT)
       primary_connection = self.bus.get_object(NM, primary_connection)
@@ -283,10 +301,10 @@ class Tici(HardwareBase):
         dev_obj = self.bus.get_object(NM, str(dev))
         metered_prop = dev_obj.Get(NM_DEV, 'Metered', dbus_interface=DBUS_PROPS, timeout=TIMEOUT)
 
-        if network_type == NetworkType.wifi:
-          if metered_prop in [NMMetered.NM_METERED_YES, NMMetered.NM_METERED_GUESS_YES]:
-            return True
-        elif network_type in [NetworkType.cell2G, NetworkType.cell3G, NetworkType.cell4G, NetworkType.cell5G]:
+        if metered_prop in [NMMetered.NM_METERED_YES, NMMetered.NM_METERED_GUESS_YES]:
+          return True
+
+        if network_type in [NetworkType.cell2G, NetworkType.cell3G, NetworkType.cell4G, NetworkType.cell5G]:
           if metered_prop == NMMetered.NM_METERED_NO:
             return False
     except Exception:
@@ -503,8 +521,33 @@ class Tici(HardwareBase):
         pass
 
     # eSIM prime
+    #
+    # get_sim_lpa() opens a logical channel to the eSIM ISD-R applet. A physical
+    # SIM has no such applet, so AT+CCHO returns "+CME ERROR: 13" and TiciLPA()
+    # raises. Upstream lets that propagate out of configure_modem(), which kills
+    # the hardwared hw_state_thread outright — no deviceState, no fan control,
+    # and no thermal management, on a device that already runs hot.
+    #
+    # It is latent rather than obvious because it only fires once ModemManager
+    # reports a modem version: at boot MM is usually still probing, so
+    # configure_modem() is skipped and hardwared survives. Restart hardwared
+    # later, when MM is warm, and it dies immediately. Observed 2026-08-04.
+    #
+    # A non-eSIM SIM is a perfectly normal configuration, so treat the failure
+    # as "not a comma eSIM" and carry on. This also matters for the Telcel block
+    # BELOW: the exception used to abort configure_modem() before the usb0 bind
+    # and QNETDEVCTL ever ran.
     dest = "/etc/NetworkManager/system-connections/esim.nmconnection"
-    if self.get_sim_lpa().is_comma_profile(sim_id) and not os.path.exists(dest):
+    try:
+      is_comma_esim = self.get_sim_lpa().is_comma_profile(sim_id)
+    except Exception as e:
+      # print, not cloudlog: nothing else in system/hardware/tici imports
+      # swaglog, and pulling it into this low-level module risks a circular
+      # import. hardwared's stdout is captured, so this still surfaces.
+      print(f"eSIM LPA unavailable (physical SIM?) — skipping eSIM prime: {e}")
+      is_comma_esim = False
+
+    if is_comma_esim and not os.path.exists(dest):
       with open(Path(__file__).parent/'esim.nmconnection') as f, tempfile.NamedTemporaryFile(mode='w') as tf:
         dat = f.read()
         dat = dat.replace("sim-id=", f"sim-id={sim_id}")

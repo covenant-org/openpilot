@@ -595,14 +595,67 @@ def get_logs_to_send_sorted() -> list[str]:
   return sorted(logs)[:-1]
 
 
+# Log forwarding is the largest continuous consumer on a metered link. Measured
+# 2026-08-04 on a parked truck: ~1.34 KB/s sustained outbound from athenad, with
+# essentially nothing inbound — roughly 3.5 GB/month against a 3.5 GB SIM plan,
+# running whether or not the vehicle is moving.
+#
+# upload_handler already refuses to move files over a metered connection
+# (`if metered and not item.allow_cellular`). log_handler had no equivalent
+# check, so swaglog shipping continued regardless. That is why the SIM kept
+# burning data even with 7.6 GB of realdata sitting unuploaded: the drain was
+# log forwarding, not file uploads.
+#
+# Gated on the NetworkMetered param rather than a fresh SubMaster, deliberately.
+# hardwared maintains that param and it survives an athenad restart, whereas a
+# SubMaster that has not yet received its first deviceState reports the default
+# False — which would forward a burst of logs on every restart, exactly when
+# reconnecting after an outage.
+#
+# Nothing is lost permanently: logs stay on disk and ship when the link is
+# unmetered again. Rotation may age some out first, which is the intended trade
+# — SIM bytes over completeness of comma's copy.
+#
+# Set ATHENA_SEND_ON_METERED=1 to restore upstream behaviour.
+#
+# stat_handler shares this gate. Measured 2026-08-04 with ws_send accounting:
+# 100% of athenad's egress was storeStats — 6 msgs/min, ~6.5 KB each, 650 B/s,
+# roughly 1.6 GB/month. forwardLogs was already zero by then, so stats were the
+# entire remaining drain.
+METERED_RECHECK_S = 60.0
+
+# Deferred stats accumulate while metered and nothing else prunes them, so bound
+# the backlog. Dropping the OLDEST is deliberate: recent stats are the useful
+# ones, and an unbounded directory is a slow disk leak.
+STATS_BACKLOG_MAX = 5000
+
+# Touch this file to turn on per-method egress accounting in ws_send; rm to stop.
+ATHENA_TX_ACCOUNTING_FILE = "/data/covenant/athena_tx_accounting"
+
+
+def metered_send_blocked(params: Params) -> bool:
+  if os.getenv("ATHENA_SEND_ON_METERED", "") not in ("", "0", "false", "no"):
+    return False
+  try:
+    return bool(params.get_bool("NetworkMetered"))
+  except Exception:
+    # A param read must never take athenad down; fail open to upstream behaviour.
+    return False
+
+
 def log_handler(end_event: threading.Event) -> None:
   if PC:
     return
 
+  params = Params()
   log_files = []
   last_scan = 0.
   while not end_event.is_set():
     try:
+      if metered_send_blocked(params):
+        end_event.wait(METERED_RECHECK_S)
+        continue
+
       curr_scan = time.monotonic()
       if curr_scan - last_scan > 10:
         log_files = get_logs_to_send_sorted()
@@ -657,13 +710,48 @@ def log_handler(end_event: threading.Event) -> None:
       cloudlog.exception("athena.log_handler.exception")
 
 
+def cap_stats_backlog(stats_dir: str, cap: int = STATS_BACKLOG_MAX) -> None:
+  """Bound the deferred-stats directory, dropping oldest first.
+
+  Deferring rather than discarding matches log_handler, but stats are removed
+  only after a successful send, so while metered they accumulate with nothing
+  to prune them. Without this the gate would trade a bandwidth leak for a
+  slower disk one.
+  """
+  try:
+    names = [n for n in os.listdir(stats_dir)
+             if not n.startswith(tempfile.gettempprefix())]
+    if len(names) <= cap:
+      return
+    paths = sorted((os.path.join(stats_dir, n) for n in names),
+                   key=os.path.getmtime)
+    for p in paths[:len(paths) - cap]:
+      try:
+        os.remove(p)
+      except OSError:
+        pass
+  except OSError:
+    pass
+
+
 def stat_handler(end_event: threading.Event) -> None:
   STATS_DIR = Paths.stats_root()
+  params = Params()
   last_scan = 0.0
 
   while not end_event.is_set():
     curr_scan = time.monotonic()
     try:
+      # storeStats was 100% of athenad's egress when measured (650 B/s,
+      # ~1.6 GB/month). upload_handler already refuses to move data over a
+      # metered link; this applies the same rule. Files are left on disk and
+      # ship when the link is unmetered again.
+      if metered_send_blocked(params):
+        cap_stats_backlog(STATS_DIR)
+        last_scan = curr_scan
+        end_event.wait(METERED_RECHECK_S)
+        continue
+
       if curr_scan - last_scan > 10:
         stat_filenames = list(filter(lambda name: not name.startswith(tempfile.gettempprefix()), os.listdir(STATS_DIR)))
         if len(stat_filenames) > 0:
@@ -757,12 +845,57 @@ def ws_recv(ws: WebSocket, end_event: threading.Event) -> None:
 
 
 def ws_send(ws: WebSocket, end_event: threading.Event) -> None:
+  # Temporary egress accounting.
+  #
+  # Toggled by the presence of ATHENA_TX_ACCOUNTING_FILE, not an env var:
+  # athenad is spawned by manage_athenad under manager, which does not inherit
+  # /data/covenant/.env, and injecting into manager's environment would mean
+  # restarting manager — far more disruptive than this measurement warrants.
+  # The file is re-checked at each report, so it can be turned on and off on a
+  # running device with `touch` / `rm`.
+  #
+  # Every byte athenad puts on the wire passes through here, so this is the one
+  # place that can attribute traffic without guessing. Reading the handlers and
+  # inferring from file counts got the answer wrong twice: `metered` turned out
+  # to gate only upload_handler, and gating log_handler changed nothing
+  # measurable. This tallies bytes by JSON-RPC method and reports periodically.
+  #
+  # Off unless the env var is set, so it costs nothing in normal operation.
+  tx_tally: dict[str, list[int]] = {}
+  tx_last_report = time.monotonic()
+  tx_accounting = os.path.exists(ATHENA_TX_ACCOUNTING_FILE)
+
   while not end_event.is_set():
     try:
       try:
         data = send_queue.get_nowait()
       except queue.Empty:
         data = low_priority_send_queue.get(timeout=1)
+
+      if tx_accounting:
+        try:
+          method = json.loads(data).get("method") or "<response>"
+        except Exception:
+          method = "<unparsed>"
+        entry = tx_tally.setdefault(method, [0, 0])
+        entry[0] += 1
+        entry[1] += len(data)
+        now = time.monotonic()
+        if now - tx_last_report >= 60.0:
+          window = now - tx_last_report
+          total = sum(v[1] for v in tx_tally.values())
+          parts = ", ".join(
+            f"{m}={v[0]}x/{v[1]}B" for m, v in
+            sorted(tx_tally.items(), key=lambda kv: -kv[1][1])
+          )
+          cloudlog.event("athena.tx_accounting", window_s=round(window, 1),
+                         total_bytes=total,
+                         bytes_per_s=round(total / max(window, 1e-9), 1),
+                         detail=parts)
+          tx_tally = {}
+          tx_last_report = now
+          tx_accounting = os.path.exists(ATHENA_TX_ACCOUNTING_FILE)
+
       for i in range(0, len(data), WS_FRAME_SIZE):
         frame = data[i:i+WS_FRAME_SIZE]
         last = i + WS_FRAME_SIZE >= len(data)
