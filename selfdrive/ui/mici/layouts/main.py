@@ -3,6 +3,7 @@ import cereal.messaging as messaging
 from openpilot.selfdrive.ui.mici.layouts.home import MiciHomeLayout
 from openpilot.selfdrive.ui.mici.layouts.settings.settings import SettingsLayout
 from openpilot.selfdrive.ui.mici.layouts.offroad_alerts import MiciOffroadAlerts
+from openpilot.selfdrive.ui.mici.widgets.emergency_button import EmergencyScreen
 from openpilot.selfdrive.ui.mici.onroad.augmented_road_view import AugmentedRoadView
 from openpilot.selfdrive.ui.ui_state import device, ui_state
 from openpilot.selfdrive.ui.mici.layouts.onboarding import OnboardingWindow
@@ -26,18 +27,25 @@ class MiciMainLayout(Scroller):
     self._setup = False
 
     # Initialize widgets
+    # The screen the truck sits on at rest. It replaces home as the resting
+    # screen because what the cab needs on a parked truck is a reachable
+    # panic button, not a build version. Home keeps everything it had and
+    # moves one swipe right — it is still the only route to Settings.
+    self._emergency_layout = EmergencyScreen()
     self._home_layout = MiciHomeLayout()
     self._alerts_layout = MiciOffroadAlerts()
     self._settings_layout = SettingsLayout()
     self._onroad_layout = AugmentedRoadView(bookmark_callback=self._on_bookmark_clicked)
 
     # Initialize widget rects
-    for widget in (self._home_layout, self._settings_layout, self._alerts_layout, self._onroad_layout):
+    for widget in (self._emergency_layout, self._home_layout, self._settings_layout,
+                   self._alerts_layout, self._onroad_layout):
       # TODO: set parent rect and use it if never passed rect from render (like in Scroller)
       widget.set_rect(rl.Rectangle(0, 0, gui_app.width, gui_app.height))
 
     self._scroller.add_widgets([
       self._alerts_layout,
+      self._emergency_layout,
       self._home_layout,
       self._onroad_layout,
     ])
@@ -71,6 +79,16 @@ class MiciMainLayout(Scroller):
       if self._alerts_layout.active_alerts() > 0:
         self._scroller.scroll_to(self._alerts_layout.rect.x)
       else:
+        # One screen across = scroller index 1, which is the emergency screen.
+        # It is written as a width and NOT as `self._emergency_layout.rect.x`,
+        # because on this first render pass the scroller has not laid its
+        # children out yet — every child rect is still 0, and asking for one
+        # here scrolls to index 0 and boots the truck onto the alerts screen.
+        # Verified by doing exactly that.
+        #
+        # So the emergency screen's position in add_widgets() is load-bearing:
+        # it must stay second, and anything inserted before it has to move this
+        # line too.
         self._scroller.scroll_to(self._rect.width)
       self._setup = True
 
@@ -90,7 +108,7 @@ class MiciMainLayout(Scroller):
       if ui_state.started:
         self._onroad_time_delay = rl.get_time()
       else:
-        self._scroll_to(self._home_layout)
+        self._scroll_to(self._emergency_layout)
 
     # FIXME: these two pops can interrupt user interacting in the settings
     if self._onroad_time_delay is not None and rl.get_time() - self._onroad_time_delay >= ONROAD_DELAY:
@@ -115,7 +133,7 @@ class MiciMainLayout(Scroller):
     else:
       # Screen turns off on timeout offroad, so pop immediately without animation
       gui_app.pop_widgets_to(self, instant=True)
-      self._scroll_to(self._home_layout)
+      self._scroll_to(self._emergency_layout)
 
   def _on_bookmark_clicked(self):
     user_bookmark = messaging.new_message('bookmarkButton')
