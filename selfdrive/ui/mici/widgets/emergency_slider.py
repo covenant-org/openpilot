@@ -36,8 +36,23 @@ MANUAL_EVENT_DIR = os.getenv('MANUAL_EVENT_DIR', '/data/covenant/manual_events')
 SOS = 'sos'
 MECHANICAL = 'mechanical'
 
-TRACK_W, TRACK_H = 520, 180
-HANDLE = 180
+# Scaled down from comma's 520x180 to leave room for a title, and kept
+# PROPORTIONAL (0.833) so the pill's rounded ends do not stretch into ovals —
+# `gui_app.texture` scales whatever it is given, it does not letterbox.
+TRACK_W, TRACK_H = 433, 150
+HANDLE = 150
+
+# Title block above the track. The screen has to say what it is for: a bare
+# handle is obvious to whoever built it and a riddle to a driver who meets it
+# once, in the worst minute of their week.
+TITLE = 'Tipo de Emergencia'
+TITLE_SIZE = 32
+TITLE_H = 40
+TITLE_GAP = 12
+
+# Icons replace the words. Two glyphs read faster than two labels, survive a
+# driver who does not read Spanish well, and cannot be clipped by the handle.
+ICON = 64
 
 # How far the handle may travel each way, and how far it must go to count.
 # Travel is what the track geometry allows; the threshold is 60% of it —
@@ -46,10 +61,6 @@ HANDLE = 180
 TRAVEL = (TRACK_W - HANDLE) // 2          # 170 px
 THRESHOLD = int(TRAVEL * 0.6)             # 102 px
 
-# Label column at each end. Wider than the handle's travel so a long word is
-# not squeezed into the gap the handle leaves; it overlaps the handle instead,
-# and is drawn on top of it.
-LABEL_W = 210
 
 PRESSED_SCALE = 1.07
 RETURN_RC = 0.05        # same as comma's slider: snappy, not instant
@@ -61,18 +72,20 @@ LEFT, RIGHT = -1, 1
 class EmergencySlider(Widget):
   """A red handle resting at centre. Drag past the threshold either way."""
 
-  def __init__(self, left_label: str, right_label: str,
-               on_left=None, on_right=None):
+  def __init__(self, left_icon: str, right_icon: str,
+               on_left=None, on_right=None, title: str = TITLE):
     super().__init__()
     self._on = {LEFT: on_left, RIGHT: on_right}
+    self._title = Label(title, font_size=TITLE_SIZE, font_weight=FontWeight.BOLD,
+                        text_color=rl.Color(255, 255, 255, 220))
 
     self._bg = gui_app.texture("icons_mici/buttons/slider_bg.png", TRACK_W, TRACK_H)
     self._circle = gui_app.texture("icons_mici/buttons/button_circle_red.png", HANDLE, HANDLE)
     self._circle_pressed = gui_app.texture("icons_mici/buttons/button_circle_red_pressed.png", HANDLE, HANDLE)
 
-    self._labels = {
-      LEFT: Label(left_label, font_size=30, font_weight=FontWeight.BOLD, text_color=rl.WHITE),
-      RIGHT: Label(right_label, font_size=30, font_weight=FontWeight.BOLD, text_color=rl.WHITE),
+    self._icons = {
+      LEFT: gui_app.texture(left_icon, ICON, ICON),
+      RIGHT: gui_app.texture(right_icon, ICON, ICON),
     }
     self._result_label = Label("", font_size=34, font_weight=FontWeight.BOLD, text_color=rl.WHITE)
 
@@ -88,8 +101,12 @@ class EmergencySlider(Widget):
   def _track_x(self) -> float:
     return self._rect.x + (self._rect.width - TRACK_W) / 2
 
+  def _content_top(self) -> float:
+    total = TITLE_H + TITLE_GAP + TRACK_H
+    return self._rect.y + (self._rect.height - total) / 2
+
   def _track_y(self) -> float:
-    return self._rect.y + (self._rect.height - TRACK_H) / 2
+    return self._content_top() + TITLE_H + TITLE_GAP
 
   def _handle_x(self) -> float:
     centre = self._track_x() + (TRACK_W - HANDLE) / 2
@@ -178,6 +195,8 @@ class EmergencySlider(Widget):
   # ── drawing ───────────────────────────────────────────────────────────────
   def _render(self, _rect) -> None:
     tx, ty = self._track_x(), self._track_y()
+    self._title.render(rl.Rectangle(self._rect.x, self._content_top(),
+                                    self._rect.width, TITLE_H))
     rl.draw_texture_ex(self._bg, rl.Vector2(tx, ty), 0.0, 1.0, rl.WHITE)
 
     if self._state != 'idle':
@@ -191,18 +210,20 @@ class EmergencySlider(Widget):
     hy = ty + (TRACK_H - HANDLE * scale) / 2
     rl.draw_texture_ex(tex, rl.Vector2(hx, hy), 0.0, scale, rl.WHITE)
 
-    # LABELS ON TOP OF THE HANDLE, not under it. They sit at the ends of the
+    # ICONS ON TOP OF THE HANDLE, not under it. They sit at the ends of the
     # track, which is exactly where the handle travels to — drawn underneath,
-    # the word you are confirming disappears beneath the thing confirming it,
-    # right at the moment you need to be sure you picked the correct side.
-    # White reads on both the black track and the red handle, so one colour
-    # works the whole way across.
+    # the thing you are confirming disappears beneath the thing confirming it,
+    # right when you need to be sure you picked the correct side. White reads on
+    # both the black track and the red handle, so one tint works all the way
+    # across; brightness alone carries the commitment.
     for side in (LEFT, RIGHT):
       alpha = int(255 * (0.45 + 0.55 * self.progress(side)))
-      label = self._labels[side]
-      label.set_text_color(rl.Color(255, 255, 255, alpha))
-      edge = tx if side == LEFT else tx + TRACK_W - LABEL_W
-      label.render(rl.Rectangle(edge, ty, LABEL_W, TRACK_H))
+      icon = self._icons[side]
+      gap = (TRACK_W - HANDLE) / 2
+      cx = (tx + gap / 2) if side == LEFT else (tx + TRACK_W - gap / 2)
+      rl.draw_texture_ex(icon,
+                         rl.Vector2(cx - icon.width / 2, ty + (TRACK_H - icon.height) / 2),
+                         0.0, 1.0, rl.Color(255, 255, 255, alpha))
 
 
 def write_manual_event(event_type: str, directory: str = MANUAL_EVENT_DIR,
@@ -260,7 +281,21 @@ class EmergencyScreen(Widget):
   def __init__(self, on_fire=None):
     super().__init__()
     self._on_fire = on_fire or self._report
-    self._slider = EmergencySlider('MECÁNICA', 'SOS',
+    # A wrench for the truck, a warning triangle for the driver. Both are pulled
+    # from the Bootstrap set comma already vendors, through comma's own
+    # prep-svg pipeline, so they match the device's drawing weight.
+    #
+    # They live under assets/covenant/ for a reason that is not organisational:
+    # `.gitattributes` sends every *.png to the LFS store named in .lfsconfig,
+    # which is comma's gitlab and not writable by us. An icon anywhere else can
+    # be committed and never pushed — the remote keeps a pointer and the device
+    # pulls 131 bytes where an image should be.
+    #
+    # Both are PURE WHITE on transparent, which is what lets the tint below dim
+    # them as the handle commits. comma's own exclamation_point.png is amber and
+    # cannot be dimmed, which is why it is not used here.
+    self._slider = EmergencySlider('covenant/wrench.png',
+                                   'covenant/exclamation-triangle-fill.png',
                                    on_left=lambda: self._on_fire(MECHANICAL),
                                    on_right=lambda: self._on_fire(SOS))
 
