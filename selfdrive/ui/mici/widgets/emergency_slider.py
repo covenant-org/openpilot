@@ -95,6 +95,25 @@ class EmergencySlider(Widget):
     centre = self._track_x() + (TRACK_W - HANDLE) / 2
     return centre + self._offset_filter.x
 
+  def is_dragging(self) -> bool:
+    """True from the moment a finger lands ON THE HANDLE until it lifts.
+
+    THE SCROLLER HAS TO BE TOLD. This screen is one item in a horizontal
+    `Scroller`, and a horizontal drag is exactly how you move between screens —
+    so without this the scroller takes the gesture and the device slides to the
+    next screen instead of letting the slide finish. The slider never completes
+    and the driver is left shoving a screen that will not stay put.
+
+    `MiciMainLayout` feeds this into `set_scrolling_enabled`, which the scroller
+    re-evaluates every frame. Same mechanism comma uses for the onroad bookmark
+    (`is_swiping_left`), for the same reason.
+
+    It flips on the PRESS rather than after movement, so the scroller is already
+    disabled before the first pixel of travel — the bookmark lets the scroll
+    start and then stops it, which is tolerable there and is not here.
+    """
+    return self._dragging
+
   def direction(self) -> int:
     """Which way the handle currently leans past the threshold, else 0."""
     if self._offset_filter.x <= -THRESHOLD:
@@ -248,6 +267,10 @@ class EmergencyScreen(Widget):
   @property
   def slider(self) -> EmergencySlider:
     return self._slider
+
+  def is_dragging(self) -> bool:
+    """Forwarded so the layout can stop the scroller stealing the slide."""
+    return self._slider.is_dragging()
 
   @staticmethod
   def _report(event_type: str) -> bool:

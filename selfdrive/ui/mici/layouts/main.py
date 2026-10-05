@@ -51,8 +51,13 @@ class MiciMainLayout(Scroller):
     ])
     self._scroller.set_reset_scroll_at_show(False)
 
-    # Disable scrolling when onroad is interacting with bookmark
-    self._scroller.set_scrolling_enabled(lambda: not self._onroad_layout.is_swiping_left())
+    # Disable scrolling while a child owns the touch — the bookmark on the
+    # onroad screen, and the emergency slider, which is a HORIZONTAL drag on a
+    # screen inside a horizontally-scrolling list. Without the second clause the
+    # scroller wins and the device slides to the next screen while the driver is
+    # trying to call for help.
+    self._scroller.set_scrolling_enabled(
+      lambda: not self._onroad_layout.is_swiping_left() and not self._emergency_layout.is_dragging())
 
     # Set callbacks
     self._setup_callbacks()
