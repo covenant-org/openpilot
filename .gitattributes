@@ -21,3 +21,16 @@ third_party/acados/*/t_renderer filter=lfs diff=lfs merge=lfs -text
 third_party/qt5/larch64/bin/lrelease filter=lfs diff=lfs merge=lfs -text
 third_party/qt5/larch64/bin/lupdate filter=lfs diff=lfs merge=lfs -text
 third_party/catch2/include/catch2/catch.hpp filter=lfs diff=lfs merge=lfs -text
+
+# Our own assets are stored in git, NOT in comma's LFS.
+#
+# `*.png filter=lfs` above sends every image to the store named in .lfsconfig,
+# which is gitlab.com/commaai/openpilot-lfs — comma's, not ours, and not
+# writable by us. A Covenant asset tracked by that rule can be committed and
+# never pushed: the remote keeps a 131-byte pointer, the device pulls the
+# pointer, and the texture fails to decode on the screen that shows while the
+# truck is booting. Found by trying: "batch request: git@gitlab.com: Permission
+# denied (publickey)".
+#
+# These files are small enough that git itself is the right store.
+selfdrive/assets/covenant/** -filter -diff -merge -text

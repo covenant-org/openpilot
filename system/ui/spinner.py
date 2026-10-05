@@ -9,22 +9,37 @@ from openpilot.system.ui.text import wrap_text
 from openpilot.system.ui.widgets import Widget
 
 # Constants
+# The type belongs in this branch with everything else it has to agree with.
+# It used to sit below it, so mici drew BIG-UI type on a 536x240 screen: 96 px
+# scaled by mici's FONT_SCALE of 1.16 is ~111 px tall, and the layout below
+# reserves TEXTURE_SIZE + WRAPPED_SPACING + LINE_HEIGHT = 254 px for a single
+# line on a screen that is 240 px high. The logo was pushed off the top and the
+# text ran off the bottom — for EVERY message, not an unlucky long one.
+#
+# mici numbers are chosen against that budget rather than scaled by eye:
+# 140 + 10 + 2 lines x 32 = 214 of 240, which leaves the logo centred and still
+# fits the two-line wraps ("Iniciando Covenant" is already one).
 if gui_app.big_ui():
   PROGRESS_BAR_WIDTH = 1000
   PROGRESS_BAR_HEIGHT = 20
   TEXTURE_SIZE = 360
   WRAPPED_SPACING = 50
   CENTERED_SPACING = 150
+  MARGIN_H = 100
+  FONT_SIZE = 96
+  LINE_HEIGHT = 104
 else:
   PROGRESS_BAR_WIDTH = 268
   PROGRESS_BAR_HEIGHT = 10
   TEXTURE_SIZE = 140
   WRAPPED_SPACING = 10
   CENTERED_SPACING = 20
+  # Wrapping width is `gui_app.width - MARGIN_H`, so this is the side gutter for
+  # the whole message, not a padding on one edge.
+  MARGIN_H = 24
+  FONT_SIZE = 28
+  LINE_HEIGHT = 32
 DEGREES_PER_SECOND = 360.0  # one full rotation per second
-MARGIN_H = 100
-FONT_SIZE = 96
-LINE_HEIGHT = 104
 DARKGRAY = (55, 55, 55, 255)
 
 
@@ -35,7 +50,7 @@ def clamp(value, min_value, max_value):
 class Spinner(Widget):
   def __init__(self):
     super().__init__()
-    self._comma_texture = gui_app.texture("images/spinner_comma.png", TEXTURE_SIZE, TEXTURE_SIZE)
+    self._comma_texture = gui_app.texture("covenant/spinner_covenant.png", TEXTURE_SIZE, TEXTURE_SIZE)
     self._spinner_texture = gui_app.texture("images/spinner_track.png", TEXTURE_SIZE, TEXTURE_SIZE, alpha_premultiply=True)
     self._rotation = 0.0
     self._progress: int | None = None
