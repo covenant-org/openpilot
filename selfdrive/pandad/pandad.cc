@@ -402,6 +402,30 @@ void pandad_run(Panda *panda) {
       if (log.find("Register 0x") != std::string::npos) {
         // Log register divergent faults as errors
         LOGE("%s", log.c_str());
+      } else if (log.find("timed out") != std::string::npos ||
+                 log.find("fault occurred") != std::string::npos ||
+                 log.find("fired too often") != std::string::npos) {
+        // THE ONLY ACCOUNT WE EVER GET OF A BUS THAT DIES.
+        //
+        // T686 lost CAN entirely on 2026-10-16 and stayed dead 43 h. The
+        // firmware knew why and said so: can_clear_send() resets the CAN core
+        // whenever a TX cannot complete, llcan_clear_send() calls llcan_init()
+        // and DISCARDS its return value, and a failed fdcan_request_init()
+        // returns without re-enabling the RX interrupt -- leaving the
+        // controller alive but permanently deaf. llcan_init prints
+        // "llcan_init timed out (1)!" on exactly that path.
+        //
+        // None of it reached us. Every one of these lines went out at LOGD,
+        // which swaglog drops: searching every swaglog on the device for the
+        // interrupt-rate faults we KNOW fired that morning returns nothing at
+        // all. We reconstructed the mechanism from firmware source instead,
+        // and it is still inference.
+        //
+        // These three patterns only print when something is already wrong, so
+        // the steady-state cost is zero. During an active storm the
+        // "fired too often" line is ~1/s per over-rate IRQ, which is the
+        // record we want and could not get.
+        LOGW("%s", log.c_str());
       } else {
         LOGD("%s", log.c_str());
       }
