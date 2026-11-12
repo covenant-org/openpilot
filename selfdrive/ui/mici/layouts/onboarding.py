@@ -107,9 +107,13 @@ class TrainingGuideDMTutorial(NavWidget):
     self._dialog = DriverCameraSetupDialog()
     self._bad_face_page = DMBadFaceDetected()
 
-    # Disable driver monitoring model when device times out for inactivity
+    # Disable driver monitoring model when device times out for inactivity, but only
+    # while this tutorial is actually on screen. The onboarding window is built on every
+    # boot even when onboarding is done, so unguarded this fired on every screen timeout
+    # (e.g. 30 s after each ignition off edge) and made manager kill camerad.
     def inactivity_callback():
-      ui_state.params.put_bool("IsDriverViewEnabled", False)
+      if gui_app.widget_in_stack(self):
+        ui_state.params.put_bool("IsDriverViewEnabled", False)
 
     device.add_interactive_timeout_callback(inactivity_callback)
 
