@@ -209,6 +209,25 @@ std::optional<bool> send_panda_states(PubMaster *pm, Panda *panda, bool is_onroa
     panda->set_safety_model(cereal::CarParams::SafetyModel::NO_OUTPUT);
   }
 
+  // Trust the panda's reported mode, not PandaSafety's cached request: that cache
+  // said "already multiplexed" through every dead-bus incident, because a panda
+  // reset or any other mode change never touches it. Nothing else re-applies the
+  // mux, and with the mux off no frame can arrive to prompt it.
+  //
+  // Rate limited because each ELM327 set goes through can_clear_send() and resets
+  // the CAN core. If a set ever fails to stick, this must not become a 10 Hz reset
+  // loop on a bus that may otherwise be working.
+  if (obd_capture) {
+    const bool elm327 = health.safety_mode_pkt == (uint8_t)(cereal::CarParams::SafetyModel::ELM327);
+    static double last_repair_ms = 0.;
+    const double now_ms = millis_since_boot();
+    if ((!elm327 || (health.safety_param_pkt != 0U)) && ((now_ms - last_repair_ms) > 1000.)) {
+      LOGW("OBD mux lost (safety %d param %d), re-applying", health.safety_mode_pkt, health.safety_param_pkt);
+      panda->set_safety_model(cereal::CarParams::SafetyModel::ELM327, 0U);
+      last_repair_ms = now_ms;
+    }
+  }
+
   if (!panda->comms_healthy()) {
     evt.setValid(false);
   }
@@ -383,10 +402,17 @@ void pandad_run(Panda *panda) {
       sm.update(0);
       engaged = sm.allAliveAndValid({"selfdriveState"}) && sm["selfdriveState"].getSelfdriveState().getEnabled();
       is_onroad = params.getBool("IsOnroad");
-      // Covenant read-only OBD capture: when offroad and can_recorder has
-      // requested OBD multiplexing, route the truck's J1939 bus so it reaches
-      // the `can` stream without waiting for an ignition/onroad transition.
-      bool obd_capture = !is_onroad && params.getBool("ObdMultiplexingEnabled");
+      // Covenant read-only OBD capture: when can_recorder has requested OBD
+      // multiplexing, route the truck's J1939 bus so it reaches the `can` stream.
+      //
+      // Deliberately NOT gated on IsOnroad. Ignition comes from EEC1 on this same
+      // bus and expires 2 s after the frames stop, so a CAN error storm drops
+      // ignition while IsOnroad still reads 1. Gating here left obd_capture false
+      // in exactly that window, which closed the relay and took the mux off the
+      // wires -- and a deaf bus can never bring ignition back. T686 2026-11-07
+      // 04:55:21: frames stop, ignition false 2 s later, safety elm327 -> noOutput,
+      // IRQs to 0.
+      bool obd_capture = params.getBool("ObdMultiplexingEnabled");
       process_panda_state(panda, &pm, engaged, is_onroad, spoofing_started, obd_capture);
       panda_safety.configureSafetyMode(is_onroad, obd_capture);
     }

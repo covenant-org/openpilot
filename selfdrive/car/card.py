@@ -30,6 +30,13 @@ carlog.addHandler(ForwardingHandler(cloudlog))
 
 def obd_callback(params: Params) -> ObdCallback:
   def set_obd_multiplexing(obd_multiplexing: bool):
+    # Covenant: fingerprinting releases the mux after its queries. On a J1939 truck
+    # the mux IS the capture path, so releasing it blinds can_recorder and drops
+    # ignition, which flips onroad again (T686 2026-11-07 04:55:56: elm327 param 1,
+    # IRQs 0). The keeper would restore it, but only after up to 3 s of dark bus.
+    if not obd_multiplexing and params.get_bool("ObdMultiplexingEnabled"):
+      cloudlog.warning("Keeping OBD multiplexing on for J1939 capture")
+      return
     if params.get_bool("ObdMultiplexingEnabled") != obd_multiplexing:
       cloudlog.warning(f"Setting OBD multiplexing to {obd_multiplexing}")
       params.remove("ObdMultiplexingChanged")
