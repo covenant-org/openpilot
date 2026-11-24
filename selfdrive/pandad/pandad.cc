@@ -209,6 +209,25 @@ std::optional<bool> send_panda_states(PubMaster *pm, Panda *panda, bool is_onroa
     panda->set_safety_model(cereal::CarParams::SafetyModel::NO_OUTPUT);
   }
 
+  // Trust the panda's reported mode, not PandaSafety's cached request: that cache
+  // said "already multiplexed" through every dead-bus incident, because a panda
+  // reset or any other mode change never touches it. Nothing else re-applies the
+  // mux, and with the mux off no frame can arrive to prompt it.
+  //
+  // Rate limited because each ELM327 set goes through can_clear_send() and resets
+  // the CAN core. If a set ever fails to stick, this must not become a 10 Hz reset
+  // loop on a bus that may otherwise be working.
+  if (obd_capture) {
+    const bool elm327 = health.safety_mode_pkt == (uint8_t)(cereal::CarParams::SafetyModel::ELM327);
+    static double last_repair_ms = 0.;
+    const double now_ms = millis_since_boot();
+    if ((!elm327 || (health.safety_param_pkt != 0U)) && ((now_ms - last_repair_ms) > 1000.)) {
+      LOGW("OBD mux lost (safety %d param %d), re-applying", health.safety_mode_pkt, health.safety_param_pkt);
+      panda->set_safety_model(cereal::CarParams::SafetyModel::ELM327, 0U);
+      last_repair_ms = now_ms;
+    }
+  }
+
   if (!panda->comms_healthy()) {
     evt.setValid(false);
   }
@@ -383,10 +402,17 @@ void pandad_run(Panda *panda) {
       sm.update(0);
       engaged = sm.allAliveAndValid({"selfdriveState"}) && sm["selfdriveState"].getSelfdriveState().getEnabled();
       is_onroad = params.getBool("IsOnroad");
-      // Covenant read-only OBD capture: when offroad and can_recorder has
-      // requested OBD multiplexing, route the truck's J1939 bus so it reaches
-      // the `can` stream without waiting for an ignition/onroad transition.
-      bool obd_capture = !is_onroad && params.getBool("ObdMultiplexingEnabled");
+      // Covenant read-only OBD capture: when can_recorder has requested OBD
+      // multiplexing, route the truck's J1939 bus so it reaches the `can` stream.
+      //
+      // Deliberately NOT gated on IsOnroad. Ignition comes from EEC1 on this same
+      // bus and expires 2 s after the frames stop, so a CAN error storm drops
+      // ignition while IsOnroad still reads 1. Gating here left obd_capture false
+      // in exactly that window, which closed the relay and took the mux off the
+      // wires -- and a deaf bus can never bring ignition back. T686 2026-11-07
+      // 04:55:21: frames stop, ignition false 2 s later, safety elm327 -> noOutput,
+      // IRQs to 0.
+      bool obd_capture = params.getBool("ObdMultiplexingEnabled");
       process_panda_state(panda, &pm, engaged, is_onroad, spoofing_started, obd_capture);
       panda_safety.configureSafetyMode(is_onroad, obd_capture);
     }
@@ -402,6 +428,30 @@ void pandad_run(Panda *panda) {
       if (log.find("Register 0x") != std::string::npos) {
         // Log register divergent faults as errors
         LOGE("%s", log.c_str());
+      } else if (log.find("timed out") != std::string::npos ||
+                 log.find("fault occurred") != std::string::npos ||
+                 log.find("fired too often") != std::string::npos) {
+        // THE ONLY ACCOUNT WE EVER GET OF A BUS THAT DIES.
+        //
+        // T686 lost CAN entirely on 2026-10-16 and stayed dead 43 h. The
+        // firmware knew why and said so: can_clear_send() resets the CAN core
+        // whenever a TX cannot complete, llcan_clear_send() calls llcan_init()
+        // and DISCARDS its return value, and a failed fdcan_request_init()
+        // returns without re-enabling the RX interrupt -- leaving the
+        // controller alive but permanently deaf. llcan_init prints
+        // "llcan_init timed out (1)!" on exactly that path.
+        //
+        // None of it reached us. Every one of these lines went out at LOGD,
+        // which swaglog drops: searching every swaglog on the device for the
+        // interrupt-rate faults we KNOW fired that morning returns nothing at
+        // all. We reconstructed the mechanism from firmware source instead,
+        // and it is still inference.
+        //
+        // These three patterns only print when something is already wrong, so
+        // the steady-state cost is zero. During an active storm the
+        // "fired too often" line is ~1/s per over-rate IRQ, which is the
+        // record we want and could not get.
+        LOGW("%s", log.c_str());
       } else {
         LOGD("%s", log.c_str());
       }
