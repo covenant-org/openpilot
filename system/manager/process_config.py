@@ -66,7 +66,11 @@ procs = [
 
   NativeProcess("loggerd", "system/loggerd", ["./loggerd"], logging),
   NativeProcess("encoderd", "system/loggerd", ["./encoderd"], only_onroad),
-  NativeProcess("stream_encoderd", "system/loggerd", ["./encoderd", "--stream"], notcar),
+  # covenant: run whenever the cameras run (upstream: notcar only, i.e. never on
+  # a truck). The covenant daemon records these hardware H.264 packets with
+  # `ffmpeg -c copy`: 20 fps for ~7% of one core, vs ~10 fps and ~25% of a core
+  # per camera for its software x264 path (measured on T686, 2026-11-25).
+  NativeProcess("stream_encoderd", "system/loggerd", ["./encoderd", "--stream"], driverview),
   PythonProcess("logmessaged", "system.logmessaged", always_run),
 
   NativeProcess("camerad", "system/camerad", ["./camerad"], driverview, enabled=not WEBCAM),
