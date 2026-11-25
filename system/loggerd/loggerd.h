@@ -47,7 +47,9 @@ struct EncoderSettings {
   }
 
   static EncoderSettings StreamEncoderSettings() {
-    int _stream_bitrate = getenv("STREAM_BITRATE") ? atoi(getenv("STREAM_BITRATE")) : 1'000'000;
+    // covenant: 3 Mbps default (upstream 1 Mbps) = the daemon's recording budget,
+    // since these packets are now the recorded evidence. STREAM_BITRATE overrides.
+    int _stream_bitrate = getenv("STREAM_BITRATE") ? atoi(getenv("STREAM_BITRATE")) : 3'000'000;
     return EncoderSettings{.encode_type = cereal::EncodeIndex::Type::QCAMERA_H264, .bitrate = _stream_bitrate , .gop_size = 15};
   }
 };
